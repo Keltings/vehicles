@@ -3,6 +3,294 @@
 {% block title %}Dashboard - Vehicle Intelligence{% endblock %}
 
 {% block content %}
+<style>
+.dashboard-grid {
+    display: grid;
+    gap: 24px;
+}
+
+.stat-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.stat-card {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 16px;
+    padding: 24px;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    border-color: var(--primary-green);
+    transform: translateY(-4px);
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: var(--text-dark);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--text-white);
+    margin-bottom: 8px;
+}
+
+.stat-trend {
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.stat-trend.up {
+    color: var(--primary-green);
+}
+
+.stat-trend.down {
+    color: var(--danger);
+}
+
+.two-column {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 30px;
+}
+
+.activity-feed {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 16px;
+    padding: 24px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.activity-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.activity-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-white);
+}
+
+.live-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: var(--primary-green);
+}
+
+.live-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--primary-green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.activity-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-dark);
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+.activity-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.activity-icon.entry {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--primary-green);
+}
+
+.activity-icon.alert {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
+
+.activity-icon.pattern {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+}
+
+.activity-content {
+    flex: 1;
+}
+
+.activity-text {
+    color: var(--text-light);
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+}
+
+.activity-time {
+    font-size: 0.8rem;
+    color: var(--text-dark);
+}
+
+.chart-container {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 16px;
+    padding: 24px;
+}
+
+.chart-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-white);
+    margin-bottom: 20px;
+}
+
+#trafficChart {
+    width: 100%;
+    height: 300px;
+}
+
+.sites-table {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 30px;
+}
+
+.sites-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.sites-table th {
+    background: var(--bg-dark);
+    color: var(--text-medium);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 16px;
+    text-align: left;
+}
+
+.sites-table td {
+    padding: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-light);
+}
+
+.sites-table tr:hover {
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.status-normal {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--primary-green);
+}
+
+.status-high {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+}
+
+.module-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 24px;
+}
+
+.module-card {
+    background: linear-gradient(135deg, var(--bg-darker) 0%, var(--bg-dark) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 20px;
+    padding: 28px 24px;
+    text-decoration: none;
+    color: var(--text-light);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.module-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 70%);
+    transition: all 0.6s ease;
+}
+
+.module-card:hover {
+    transform: translateY(-8px);
+    border-color: var(--primary-green);
+    box-shadow: 0 12px 40px rgba(16, 185, 129, 0.4);
+}
+
+.module-card:hover::before {
+    top: -20%;
+    right: -20%;
+}
+
+.module-icon {
+    font-size: 2.5rem;
+    color: var(--primary-green);
+    margin-bottom: 16px;
+}
+
+.module-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: var(--text-white);
+}
+
+.module-description {
+    font-size: 0.9rem;
+    color: var(--text-medium);
+    line-height: 1.5;
+        margin-bottom: 16px;
+
+}
+</style>
+
 <div class="page-header">
     <h1 class="page-title">Dashboard Overview</h1>
     <p class="page-subtitle">Real-time vehicle tracking and analytics</p>
@@ -12,10 +300,10 @@
 <div class="stat-cards">
     <div class="stat-card">
         <div class="stat-label">Total Vehicles Tracked</div>
-        <div class="stat-value">{{ total_vehicles|default:"0"|floatformat:0 }}</div>
-        <div class="stat-trend {% if trend_percent > 0 %}up{% else %}down{% endif %}">
-            <i class="fas fa-arrow-{% if trend_percent > 0 %}up{% else %}down{% endif %}"></i>
-            <span>{{ todays_entries|default:"0" }} entries today</span>
+        <div class="stat-value">{{ total_vehicles|floatformat:0 }}</div>
+        <div class="stat-trend {% if todays_entries > yesterday_entries %}up{% else %}down{% endif %}">
+            <i class="fas fa-arrow-{% if todays_entries > yesterday_entries %}up{% else %}down{% endif %}"></i>
+            <span>{{ todays_entries|default:"0" }} entries (most recent day)</span>
         </div>
     </div>
     
@@ -47,7 +335,63 @@
     </div>
 </div>
 
-<!-- 3 MODULE CARDS -->
+<!-- RECENT ACTIVITY & TRAFFIC CHART -->
+<div class="two-column">
+    <div class="activity-feed">
+        <div class="activity-header">
+            <h3 class="activity-title">Recent Activity</h3>
+            <div class="live-indicator">
+                <span class="live-dot"></span>
+                Live
+            </div>
+        </div>
+        
+        {% for activity in recent_activities %}
+        <div class="activity-item">
+            <div class="activity-icon {{ activity.type }}">
+                <i class="fas fa-{{ activity.icon }}"></i>
+            </div>
+            <div class="activity-content">
+                <div class="activity-text">{{ activity.text|safe }}</div>
+                <div class="activity-time">{{ activity.time }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <div class="chart-container">
+        <h3 class="chart-title">Site Traffic - Latest 7 Days of Data</h3>
+        <div id="trafficChart"></div>
+    </div>
+</div>
+
+<!-- TOP SITES TABLE -->
+<div class="sites-table">
+    <table>
+        <thead>
+            <tr>
+                <th>Site Name</th>
+                <th>Entries Today</th>
+                <th>Current Occupancy</th>
+                <th>Avg. Duration</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for site in top_sites %}
+            <tr>
+                <td style="font-weight: 600; color: var(--text-white);">{{ site.site_name }}</td>
+                <td>{{ site.entries_today }}</td>
+                <td>{{ site.current_occupancy }} / {{ site.capacity|default:"N/A" }}</td>
+                <td>{{ site.avg_duration }}</td>
+                <td><span class="status-badge status-{{ site.status }}">{{ site.status|upper }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- 3 BIG MODULE CARDS -->
 <div class="module-cards">
     <a href="{% url 'analytics_overview' %}" class="module-card">
         <div class="module-icon">
@@ -55,28 +399,62 @@
         </div>
         <h2 class="module-title">Analytics</h2>
         <p class="module-description">
-            Comprehensive vehicle and site analytics. View trends, patterns, and detailed reports across all locations.
+            Comprehensive insights across sites, time patterns, vehicle types, and behavioral analysis.
         </p>
     </a>
     
-    <a href="{% url 'vehicle_search' %}" class="module-card">
-    <div class="module-icon">
-        <i class="fas fa-car"></i>
-    </div>
-        <h2 class="module-title">Vehicle Behavior</h2>
+    <a href="{% url 'vehicle_list' %}" class="module-card">
+        <div class="module-icon">
+            <i class="fas fa-car"></i>
+        </div>
+        <h2 class="module-title">Vehicle Profiles</h2>
         <p class="module-description">
-            Search and analyze individual vehicle patterns, visit history, and behavioral insights.
+            Search and analyze individual vehicles, view complete history, and track movement patterns.
         </p>
     </a>
     
     <a href="{% url 'alerts_center' %}" class="module-card">
-    <div class="module-icon">
-        <i class="fas fa-bell"></i>
-    </div>
+        <div class="module-icon">
+            <i class="fas fa-bell"></i>
+        </div>
         <h2 class="module-title">Alerts</h2>
         <p class="module-description">
-            Manage vehicle alerts, watchlist, and automated notifications for suspicious activity.
+            Manage flagged vehicles, configure watchlist rules, and receive automated notifications.
         </p>
     </a>
 </div>
+
+<script>
+// Traffic chart data
+var trafficData = {{ traffic_chart_data|safe }};
+
+var days = trafficData.map(d => d.day);
+var counts = trafficData.map(d => d.count);
+
+var trace = {
+    x: days,
+    y: counts,
+    type: 'bar',
+    marker: {
+        color: '#10b981',
+        opacity: 0.8
+    }
+};
+
+var layout = {
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: '#cbd5e1' },
+    xaxis: {
+        gridcolor: 'rgba(255,255,255,0.1)'
+    },
+    yaxis: {
+        gridcolor: 'rgba(255,255,255,0.1)'
+    },
+    margin: { t: 10, b: 40, l: 50, r: 10 }
+};
+
+Plotly.newPlot('trafficChart', [trace], layout, {responsive: true});
+</script>
+
 {% endblock %}

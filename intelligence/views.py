@@ -58,35 +58,164 @@ def logout_view(request):
 @login_required
 def dashboard_view(request):
     from django.utils import timezone
-    from datetime import timedelta
+    from datetime import timedelta, datetime
+    from django.db.models.functions import TruncDate
+    import json
     
     # Get basic stats
     total_vehicles = Vehicle.objects.count()
     active_sites = Vehicle.objects.values('site_name').distinct().count()
     flagged_vehicles = VehicleFlag.objects.filter(is_active=True).count()
     
-    # Today's data
-    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    todays_entries = Vehicle.objects.filter(entry_time__gte=today_start).count()
-    
-    # Yesterday's data for comparison
-    yesterday_start = today_start - timedelta(days=1)
-    yesterday_entries = Vehicle.objects.filter(
-        entry_time__gte=yesterday_start,
-        entry_time__lt=today_start
-    ).count()
-    
-    # Calculate trend
-    if yesterday_entries > 0:
-        trend_percent = round(((todays_entries - yesterday_entries) / yesterday_entries) * 100, 1)
+        # Today's data
+    # Get most recent date from data (not today)
+    latest_vehicle = Vehicle.objects.order_by('-entry_time').first()
+
+    if latest_vehicle:
+        latest_date = latest_vehicle.entry_time.date()
+        latest_date_start = timezone.make_aware(
+            datetime.combine(latest_date, datetime.min.time())
+        )
+        latest_date_end = latest_date_start + timedelta(days=1)
+        
+        todays_entries = Vehicle.objects.filter(
+            entry_time__gte=latest_date_start,
+            entry_time__lt=latest_date_end
+        ).count()
+        
+        # Previous day
+        previous_date_start = latest_date_start - timedelta(days=1)
+        previous_date_end = latest_date_start
+        
+        yesterday_entries = Vehicle.objects.filter(
+            entry_time__gte=previous_date_start,
+            entry_time__lt=previous_date_end
+        ).count()
     else:
-        trend_percent = 0
+        todays_entries = 0
+        yesterday_entries = 0
     
     # Vehicles without exit (potential issues)
     no_exit_vehicles = Vehicle.objects.filter(exit_time__isnull=True).count()
     
-    # Recent vehicles
-    recent_vehicles = Vehicle.objects.order_by('-entry_time')[:10]
+        # ============================================
+    # RECENT ACTIVITIES (Last 10 entries from data)
+    # ============================================
+    recent_vehicles = Vehicle.objects.order_by('-entry_time')[:5]
+    recent_flags = VehicleFlag.objects.filter(is_active=True).order_by('-created_at')[:3]
+
+    activities = []
+
+    # Add recent vehicle entries (show actual entry time, not relative)
+    for v in recent_vehicles:
+        plate_masked = mask_plate_number(v.plate_number)
+        
+        activities.append({
+            'type': 'entry',
+            'icon': 'car',
+            'text': f'<strong>{plate_masked}</strong> entered {v.site_name}',
+            'time': v.entry_time.strftime('%b %d, %Y %H:%M')
+        })
+
+    # Add recent alerts (show actual creation time)
+    for flag in recent_flags:
+        plate_masked = mask_plate_number(flag.plate_number)
+        
+        activities.append({
+            'type': 'alert',
+            'icon': 'exclamation-triangle',
+            'text': f'<strong>{plate_masked}</strong> flagged - {flag.get_reason_display()}',
+            'time': flag.created_at.strftime('%b %d, %Y %H:%M')
+        })
+
+    # ============================================
+    # TRAFFIC CHART (Last 7 days of available data)
+    # ============================================
+    # Get the most recent date in the data
+    latest_entry = Vehicle.objects.order_by('-entry_time').first()
+
+    if latest_entry:
+        latest_date = latest_entry.entry_time.date()
+        seven_days_before = latest_date - timedelta(days=6)  # 7 days including latest
+        
+        traffic_data = Vehicle.objects.filter(
+            entry_time__date__gte=seven_days_before,
+            entry_time__date__lte=latest_date
+        ).annotate(
+            day=TruncDate('entry_time')
+        ).values('day').annotate(
+            count=Count('id')
+        ).order_by('day')
+        
+        traffic_chart = []
+        for item in traffic_data:
+            traffic_chart.append({
+                'day': item['day'].strftime('%b %d'),  # Show actual date
+                'count': item['count']
+            })
+    else:
+        traffic_chart = []
+
+    # ============================================
+    # TOP SITES (From most recent date in data)
+    # ============================================
+    if latest_entry:
+        latest_date_start = timezone.make_aware(
+            datetime.combine(latest_entry.entry_time.date(), datetime.min.time())
+        )
+        latest_date_end = latest_date_start + timedelta(days=1)
+        
+        site_stats = Vehicle.objects.filter(
+            entry_time__gte=latest_date_start,
+            entry_time__lt=latest_date_end
+        ).values('site_name').annotate(
+            entries_today=Count('id')
+        ).order_by('-entries_today')[:5]
+    else:
+        site_stats = []
+
+    top_sites = []
+    for site in site_stats:
+        # Calculate current occupancy (from that date)
+        current_occupancy = Vehicle.objects.filter(
+            site_name=site['site_name'],
+            entry_time__date=latest_entry.entry_time.date(),
+            exit_time__isnull=True
+        ).count()
+        
+        # Calculate average duration for that day
+        avg_duration = "N/A"
+        site_vehicles = Vehicle.objects.filter(
+            site_name=site['site_name'],
+            exit_time__isnull=False,
+            entry_time__gte=latest_date_start,
+            entry_time__lt=latest_date_end
+        )
+        
+        if site_vehicles.exists():
+            durations = []
+            for v in site_vehicles:
+                duration_seconds = (v.exit_time - v.entry_time).total_seconds()
+                durations.append(duration_seconds)
+            
+            avg_seconds = sum(durations) / len(durations)
+            avg_hours = int(avg_seconds // 3600)
+            avg_minutes = int((avg_seconds % 3600) // 60)
+            avg_duration = f"{avg_hours}h {avg_minutes}m"
+        
+        # Determine status
+        status = 'normal'
+        if current_occupancy > 300:
+            status = 'high'
+        
+        top_sites.append({
+            'site_name': site['site_name'],
+            'entries_today': site['entries_today'],
+            'current_occupancy': current_occupancy,
+            'capacity': 500,
+            'avg_duration': avg_duration,
+            'status': status
+        })
     
     context = {
         'total_vehicles': total_vehicles,
@@ -94,12 +223,20 @@ def dashboard_view(request):
         'flagged_vehicles': flagged_vehicles,
         'todays_entries': todays_entries,
         'yesterday_entries': yesterday_entries,
-        'trend_percent': trend_percent,
         'no_exit_vehicles': no_exit_vehicles,
-        'recent_vehicles': recent_vehicles,
+        'recent_activities': activities,
+        'traffic_chart_data': json.dumps(traffic_chart),
+        'top_sites': top_sites,
     }
     
     return render(request, 'dashboard.html', context)
+
+
+def mask_plate_number(plate):
+    """Mask middle characters of plate number"""
+    if len(plate) <= 5:
+        return plate[:2] + '***' + plate[-1:]
+    return plate[:3] + '***' + plate[-2:]
 
 
 # ==========================================
