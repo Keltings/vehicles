@@ -1,0 +1,408 @@
+{% extends 'base.html' %}
+
+{% block title %}Watchlist Management{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">👁️ Watchlist Management</h1>
+    <p class="page-subtitle">Flag vehicles and configure alert rules</p>
+</div>
+
+<style>
+.top-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.add-flag-btn {
+    padding: 12px 24px;
+    background: var(--primary-green);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.watchlist-table {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.watchlist-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.watchlist-table th {
+    background: var(--bg-dark);
+    color: var(--text-medium);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 16px;
+    text-align: left;
+}
+
+.watchlist-table td {
+    padding: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-light);
+}
+
+.watchlist-table tr:hover {
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.plate-cell {
+    font-weight: 700;
+    color: var(--text-white);
+    font-size: 1.1rem;
+}
+
+.priority-badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.priority-high {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
+
+.priority-medium {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+}
+
+.priority-low {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--primary-green);
+}
+
+.action-btns {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-icon {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.btn-edit {
+    background: var(--bg-dark);
+    color: var(--primary-green);
+}
+
+.btn-remove {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-dark);
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    opacity: 0.3;
+}
+
+/* MODAL */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 20px;
+    max-width: 600px;
+    width: 90%;
+    padding: 32px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.modal-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-white);
+}
+
+.modal-close {
+    font-size: 1.5rem;
+    color: var(--text-dark);
+    cursor: pointer;
+    background: none;
+    border: none;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-medium);
+    margin-bottom: 8px;
+}
+
+.form-input, .form-select, .form-textarea {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--bg-dark);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 8px;
+    color: var(--text-light);
+    font-size: 0.95rem;
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+    outline: none;
+    border-color: var(--primary-green);
+}
+
+.form-textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.checkbox-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.checkbox-item label {
+    color: var(--text-light);
+    cursor: pointer;
+}
+
+.form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 24px;
+}
+
+.btn-submit {
+    padding: 12px 32px;
+    background: var(--primary-green);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.btn-cancel {
+    padding: 12px 32px;
+    background: var(--bg-dark);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: var(--text-light);
+    font-weight: 600;
+    cursor: pointer;
+}
+</style>
+
+<div class="top-actions">
+    <div>
+        <h2 style="color: var(--text-white); font-size: 1.3rem;">Flagged Vehicles</h2>
+        <p style="color: var(--text-dark);">{{ flagged_vehicles|length }} vehicle(s) on watchlist</p>
+    </div>
+    <button class="add-flag-btn" onclick="openAddModal()">
+        <i class="fas fa-plus"></i> Add to Watchlist
+    </button>
+</div>
+
+{% if flagged_vehicles %}
+<div class="watchlist-table">
+    <table>
+        <thead>
+            <tr>
+                <th>Plate Number</th>
+                <th>Reason</th>
+                <th>Priority</th>
+                <th>Flagged By</th>
+                <th>Date Added</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for flag in flagged_vehicles %}
+            <tr>
+                <td class="plate-cell">{{ flag.plate_number }}</td>
+                <td>{{ flag.get_reason_display }}</td>
+                <td><span class="priority-badge priority-{{ flag.priority }}">{{ flag.get_priority_display }}</span></td>
+                <td>{{ flag.flagged_by.username }}</td>
+                <td>{{ flag.created_at|date:"M d, Y" }}</td>
+                <td>
+                    <div class="action-btns">
+                        <button class="btn-icon btn-edit">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <td>
+    <div class="action-btns">
+        <button class="btn-icon btn-edit" onclick="alert('Edit functionality coming soon!')">
+            <i class="fas fa-edit"></i> Edit
+        </button>
+        <form method="post" action="{% url 'remove_from_watchlist' flag.id %}" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn-icon btn-remove" onclick="return confirm('Remove {{ flag.plate_number }} from watchlist?')">
+                <i class="fas fa-trash"></i> Remove
+            </button>
+        </form>
+    </div>
+</td>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="watchlist-table">
+    <div class="empty-state">
+        <i class="fas fa-list"></i>
+        <h3 style="color: var(--text-white); margin-bottom: 8px;">No Vehicles Flagged</h3>
+        <p>Start monitoring vehicles by adding them to the watchlist</p>
+    </div>
+</div>
+{% endif %}
+
+<!-- ADD FLAG MODAL -->
+<div id="addFlagModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title">Add Vehicle to Watchlist</h2>
+            <button class="modal-close" onclick="closeAddModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <form method="post" action="">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label class="form-label">Plate Number *</label>
+            <input type="text" name="plate_number" class="form-input" placeholder="e.g., KBY028L" list="plateList" required>
+            <datalist id="plateList">
+                {% for plate in recent_plates %}
+                <option value="{{ plate }}">
+                {% endfor %}
+            </datalist>            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Reason *</label>
+                <select name="reason" class="form-select" required>
+                    <option value="suspicious">Suspicious Behavior</option>
+                    <option value="frequent">Frequent Visitor</option>
+                    <option value="overstay">Overstay Pattern</option>
+                    <option value="payment">Payment Issue</option>
+                    <option value="security">Security Concern</option>
+                    <option value="investigation">Under Investigation</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Priority Level *</label>
+                <select name="priority" class="form-select" required>
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Description *</label>
+                <textarea name="description" class="form-textarea" placeholder="Provide details about why this vehicle is being flagged..." required></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Alert Rules</label>
+                <div class="checkbox-group">
+                    <div class="checkbox-item">
+                        <input type="checkbox" name="alert_on_entry" id="alert_entry" checked>
+                        <label for="alert_entry">Send alert when vehicle enters any site</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeAddModal()">Cancel</button>
+                <button type="submit" class="btn-submit">Add to Watchlist</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openAddModal() {
+    document.getElementById('addFlagModal').classList.add('active');
+}
+
+function closeAddModal() {
+    document.getElementById('addFlagModal').classList.remove('active');
+}
+
+// Close on outside click
+document.getElementById('addFlagModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeAddModal();
+    }
+});
+</script>
+
+{% endblock %}

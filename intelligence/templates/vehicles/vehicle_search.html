@@ -1,0 +1,328 @@
+{% extends 'base.html' %}
+
+{% block title %}Vehicle Behavior{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">🚗 Vehicle Behavior Search</h1>
+    <p class="page-subtitle">Search and analyze individual vehicle patterns</p>
+</div>
+
+<style>
+.search-container {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 30px;
+}
+
+.search-box {
+    display: flex;
+    gap: 12px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.search-input {
+    flex: 1;
+    padding: 14px 20px;
+    background: var(--bg-dark);
+    border: 2px solid rgba(16, 185, 129, 0.3);
+    border-radius: 12px;
+    color: var(--text-light);
+    font-size: 1.1rem;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--primary-green);
+}
+
+.search-btn {
+    padding: 14px 32px;
+    background: var(--primary-green);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.search-btn:hover {
+    background: var(--green-dark);
+}
+
+.results-container {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 24px;
+}
+
+.vehicle-card {
+    background: var(--bg-dark);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.vehicle-card:hover {
+    border-color: var(--primary-green);
+    transform: translateX(4px);
+}
+
+.vehicle-plate {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary-green);
+    margin-bottom: 12px;
+}
+
+.vehicle-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.info-label {
+    font-size: 0.8rem;
+    color: var(--text-dark);
+    text-transform: uppercase;
+}
+
+.info-value {
+    font-size: 1rem;
+    color: var(--text-light);
+    font-weight: 600;
+}
+
+.no-results {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-dark);
+}
+
+.no-results i {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    opacity: 0.3;
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.badge-success {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--primary-green);
+}
+
+.badge-warning {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+}
+
+.badge-danger {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
+
+/* MODAL */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 20px;
+    max-width: 800px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 32px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.modal-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-white);
+}
+
+.modal-close {
+    font-size: 1.5rem;
+    color: var(--text-dark);
+    cursor: pointer;
+    background: none;
+    border: none;
+}
+
+.modal-section {
+    margin-bottom: 24px;
+}
+
+.section-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--primary-green);
+    margin-bottom: 16px;
+}
+
+.visit-item {
+    background: var(--bg-dark);
+    border-left: 3px solid var(--primary-green);
+    padding: 16px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+}
+
+.visit-time {
+    font-size: 0.9rem;
+    color: var(--text-medium);
+    margin-bottom: 8px;
+}
+
+.visit-site {
+    font-weight: 600;
+    color: var(--text-white);
+}
+</style>
+
+<!-- SEARCH BOX -->
+<div class="search-container">
+    <form method="get" class="search-box">
+        <input 
+            type="text" 
+            name="plate" 
+            class="search-input" 
+            placeholder="Enter plate number (e.g., KBY028L)" 
+            value="{{ plate }}"
+            required
+        >
+        <button type="submit" class="search-btn">
+            <i class="fas fa-search"></i> Search
+        </button>
+    </form>
+</div>
+
+<!-- RESULTS -->
+{% if plate %}
+<div class="results-container">
+    {% if results %}
+    <h3 class="section-title">Found {{ results|length }} Record(s) for "{{ plate }}"</h3>
+    
+    {% for vehicle in results %}
+    <div class="vehicle-card" onclick="showVehicleModal('{{ vehicle.id }}')">
+        <div class="vehicle-plate">
+            {{ vehicle.plate_number }}
+            {% if not vehicle.exit_time %}
+            <span class="badge badge-warning">Currently Inside</span>
+            {% endif %}
+        </div>
+        
+        <div class="vehicle-info">
+            <div class="info-item">
+                <span class="info-label">Site</span>
+                <span class="info-value">{{ vehicle.site_name }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Vehicle Type</span>
+                <span class="info-value">{{ vehicle.vehicle_type|default:"Unknown" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Entry Time</span>
+                <span class="info-value">{{ vehicle.entry_time|date:"M d, Y H:i" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Exit Time</span>
+                <span class="info-value">
+                    {% if vehicle.exit_time %}
+                    {{ vehicle.exit_time|date:"M d, Y H:i" }}
+                    {% else %}
+                    <span class="badge badge-warning">Still Inside</span>
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    
+    {% else %}
+    <div class="no-results">
+        <i class="fas fa-search"></i>
+        <h3>No vehicles found for "{{ plate }}"</h3>
+        <p>Try searching with a different plate number</p>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- MODAL (to be populated via AJAX) -->
+<div id="vehicleModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title">Vehicle Details</h2>
+            <button class="modal-close" onclick="closeModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="modalBody">
+            <!-- Content loaded here -->
+        </div>
+    </div>
+</div>
+
+<script>
+function showVehicleModal(vehicleId) {
+    // For now just show basic info, we can enhance later
+    document.getElementById('vehicleModal').classList.add('active');
+}
+
+function closeModal() {
+    document.getElementById('vehicleModal').classList.remove('active');
+}
+
+// Close modal on outside click
+document.getElementById('vehicleModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeModal();
+    }
+});
+</script>
+
+{% endblock %}

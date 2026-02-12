@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Vehicle Intelligence{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Dashboard Overview</h1>
+    <p class="page-subtitle">Real-time vehicle tracking and analytics</p>
+</div>
+
+<!-- 4 STAT CARDS -->
+<div class="stat-cards">
+    <div class="stat-card">
+        <div class="stat-label">Total Vehicles Tracked</div>
+        <div class="stat-value">{{ total_vehicles|default:"0"|floatformat:0 }}</div>
+        <div class="stat-trend {% if trend_percent > 0 %}up{% else %}down{% endif %}">
+            <i class="fas fa-arrow-{% if trend_percent > 0 %}up{% else %}down{% endif %}"></i>
+            <span>{{ todays_entries|default:"0" }} entries today</span>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Active Sites</div>
+        <div class="stat-value">{{ active_sites|default:"0" }}</div>
+        <div class="stat-trend up">
+            <i class="fas fa-map-marker-alt"></i>
+            <span>Across all locations</span>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">Flagged Vehicles</div>
+        <div class="stat-value">{{ flagged_vehicles|default:"0" }}</div>
+        <div class="stat-trend {% if flagged_vehicles > 0 %}down{% else %}up{% endif %}">
+            <i class="fas fa-flag"></i>
+            <span>{% if flagged_vehicles > 0 %}Needs attention{% else %}All clear{% endif %}</span>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-label">No Exit Records</div>
+        <div class="stat-value">{{ no_exit_vehicles|default:"0" }}</div>
+        <div class="stat-trend down">
+            <i class="fas fa-exclamation-circle"></i>
+            <span>Vehicles still inside</span>
+        </div>
+    </div>
+</div>
+
+<!-- 3 MODULE CARDS -->
+<div class="module-cards">
+    <a href="{% url 'analytics_overview' %}" class="module-card">
+        <div class="module-icon">
+            <i class="fas fa-chart-line"></i>
+        </div>
+        <h2 class="module-title">Analytics</h2>
+        <p class="module-description">
+            Comprehensive vehicle and site analytics. View trends, patterns, and detailed reports across all locations.
+        </p>
+    </a>
+    
+    <a href="{% url 'vehicle_search' %}" class="module-card">
+    <div class="module-icon">
+        <i class="fas fa-car"></i>
+    </div>
+        <h2 class="module-title">Vehicle Behavior</h2>
+        <p class="module-description">
+            Search and analyze individual vehicle patterns, visit history, and behavioral insights.
+        </p>
+    </a>
+    
+    <a href="{% url 'alerts_center' %}" class="module-card">
+    <div class="module-icon">
+        <i class="fas fa-bell"></i>
+    </div>
+        <h2 class="module-title">Alerts</h2>
+        <p class="module-description">
+            Manage vehicle alerts, watchlist, and automated notifications for suspicious activity.
+        </p>
+    </a>
+</div>
+{% endblock %}

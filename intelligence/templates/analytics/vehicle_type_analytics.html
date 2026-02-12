@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+
+{% block title %}Vehicle Type Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">🚗 Vehicle Type Analytics</h1>
+    <p class="page-subtitle">Distribution of vehicle types and brands</p>
+</div>
+
+<style>
+.filters-bar {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: end;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.filter-label {
+    font-size: 0.85rem;
+    color: var(--text-medium);
+    font-weight: 600;
+}
+
+.filter-select {
+    padding: 10px 14px;
+    background: var(--bg-dark);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 8px;
+    color: var(--text-light);
+    font-size: 0.9rem;
+    min-width: 180px;
+}
+
+.filter-btn {
+    padding: 10px 24px;
+    background: var(--primary-green);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.chart-container {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.chart-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-white);
+    margin-bottom: 20px;
+}
+
+#typeChart, #brandChart {
+    width: 100%;
+    height: 400px;
+}
+
+.type-breakdown {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 24px;
+}
+
+.breakdown-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.breakdown-item:last-child {
+    border-bottom: none;
+}
+
+.breakdown-label {
+    font-size: 1rem;
+    color: var(--text-light);
+}
+
+.breakdown-bar {
+    flex: 1;
+    margin: 0 20px;
+    height: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.breakdown-fill {
+    height: 100%;
+    background: var(--primary-green);
+    border-radius: 4px;
+}
+
+.breakdown-value {
+    font-weight: 700;
+    color: var(--primary-green);
+}
+</style>
+
+<!-- FILTERS -->
+<form method="get" class="filters-bar">
+    <div class="filter-group">
+        <label class="filter-label">Site</label>
+        <select name="site" class="filter-select">
+            <option value="">All Sites</option>
+            {% for s in sites %}
+            <option value="{{ s }}" {% if site == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label class="filter-label">&nbsp;</label>
+        <button type="submit" class="filter-btn">
+            <i class="fas fa-filter"></i> Apply
+        </button>
+    </div>
+</form>
+
+<!-- PIE CHART -->
+<div class="chart-container">
+    <h3 class="chart-title">Vehicle Type Distribution</h3>
+    <div id="typeChart"></div>
+</div>
+
+<!-- BREAKDOWN TABLE -->
+<div class="type-breakdown">
+    <h3 class="chart-title">Detailed Breakdown</h3>
+    {% for item in type_data %}
+    <div class="breakdown-item">
+        <div class="breakdown-label">{{ item.type }}</div>
+        <div class="breakdown-bar">
+            <div class="breakdown-fill" style="width: {{ item.percentage }}%"></div>
+        </div>
+        <div class="breakdown-value">{{ item.percentage }}% ({{ item.count|floatformat:0 }})</div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+var typeDataRaw = JSON.parse('{{ type_data_json|escapejs }}');
+
+if (typeDataRaw && typeDataRaw.length > 0) {
+    var labels = typeDataRaw.map(function(d) { return d.type; });
+    var values = typeDataRaw.map(function(d) { return d.count; });
+
+    var data = [{
+        labels: labels,
+        values: values,
+        type: 'pie',
+        marker: {
+            colors: ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5', '#059669', '#047857']
+        },
+        textinfo: 'label+percent',
+        textfont: {
+            color: '#ffffff'
+        }
+    }];
+
+    var layout = {
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        font: { color: '#cbd5e1' },
+        showlegend: true,
+        legend: {
+            font: { color: '#cbd5e1' }
+        },
+        margin: { t: 20, b: 20, l: 20, r: 20 }
+    };
+
+    Plotly.newPlot('typeChart', data, layout, {responsive: true});
+}
+</script>
+
+{% endblock %}

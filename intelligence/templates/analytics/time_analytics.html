@@ -1,0 +1,241 @@
+{% extends 'base.html' %}
+
+{% block title %}Time Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">⏰ Time Analytics</h1>
+    <p class="page-subtitle">Peak hours and temporal patterns</p>
+</div>
+
+<style>
+.filters-bar {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: end;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.filter-label {
+    font-size: 0.85rem;
+    color: var(--text-medium);
+    font-weight: 600;
+}
+
+.filter-select, .filter-input {
+    padding: 10px 14px;
+    background: var(--bg-dark);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 8px;
+    color: var(--text-light);
+    font-size: 0.9rem;
+    min-width: 180px;
+}
+
+.filter-select:focus, .filter-input:focus {
+    outline: none;
+    border-color: var(--primary-green);
+}
+
+.filter-btn {
+    padding: 10px 24px;
+    background: var(--primary-green);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.filter-btn:hover {
+    background: var(--green-dark);
+}
+
+.filter-btn-reset {
+    padding: 10px 24px;
+    background: var(--bg-dark);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: var(--text-light);
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.filter-btn-reset:hover {
+    background: var(--bg-darker);
+}
+
+.chart-container {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    min-height: 400px;
+}
+
+.chart-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-white);
+    margin-bottom: 20px;
+}
+
+#hourlyChart {
+    width: 100%;
+    height: 400px;
+}
+
+.stats-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.summary-card {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+}
+
+.summary-label {
+    font-size: 0.8rem;
+    color: var(--text-dark);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.summary-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--primary-green);
+}
+</style>
+
+<!-- FILTERS -->
+<form method="get" action="" class="filters-bar">
+    <div class="filter-group">
+        <label class="filter-label">Date Range</label>
+        <select name="date_range" class="filter-select">
+            <option value="7" {% if date_range == '7' %}selected{% endif %}>Last 7 Days</option>
+            <option value="30" {% if date_range == '30' %}selected{% endif %}>Last 30 Days</option>
+            <option value="90" {% if date_range == '90' %}selected{% endif %}>Last 90 Days</option>
+            <option value="all" {% if date_range == 'all' %}selected{% endif %}>All Time</option>
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label class="filter-label">Site</label>
+        <select name="site" class="filter-select">
+            <option value="">All Sites</option>
+            {% for s in sites %}
+            <option value="{{ s }}" {% if site == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label class="filter-label">Vehicle Type</label>
+        <select name="vehicle_type" class="filter-select">
+            <option value="">All Types</option>
+            {% for vt in vehicle_types %}
+            <option value="{{ vt }}" {% if vehicle_type == vt %}selected{% endif %}>{{ vt }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label class="filter-label">&nbsp;</label>
+        <button type="submit" class="filter-btn">
+            <i class="fas fa-filter"></i> Apply Filters
+        </button>
+    </div>
+
+    <div class="filter-group">
+        <label class="filter-label">&nbsp;</label>
+        <a href="{% url 'time_analytics' %}" class="filter-btn-reset">
+            <i class="fas fa-undo"></i> Reset
+        </a>
+    </div>
+</form>
+
+
+<!-- SUMMARY STATS -->
+<div class="stats-summary">
+    <div class="summary-card">
+        <div class="summary-label">Total Entries</div>
+        <div class="summary-value">{{ total_entries|floatformat:0 }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">Peak Hour</div>
+        <div class="summary-value">{{ peak_hour }}:00</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-label">Avg per Hour</div>
+        <div class="summary-value">{{ avg_per_hour|floatformat:0 }}</div>
+    </div>
+</div>
+
+<!-- CHART -->
+<div class="chart-container">
+    <h3 class="chart-title">Hourly Entry Distribution</h3>
+    <div id="hourlyChart"></div>
+</div>
+
+<script>
+var hourlyDataRaw = JSON.parse('{{ hourly_data|escapejs }}');
+
+console.log('Hourly data:', hourlyDataRaw);
+
+if (hourlyDataRaw && hourlyDataRaw.length > 0) {
+    var hours = hourlyDataRaw.map(function(d) { return d.hour + ':00'; });
+    var counts = hourlyDataRaw.map(function(d) { return d.count; });
+
+    var trace = {
+        x: hours,
+        y: counts,
+        type: 'bar',
+        marker: {
+            color: '#10b981',
+            opacity: 0.8
+        }
+    };
+
+    var layout = {
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        font: { color: '#cbd5e1' },
+        xaxis: {
+            title: 'Hour of Day',
+            gridcolor: 'rgba(255,255,255,0.1)'
+        },
+        yaxis: {
+            title: 'Number of Entries',
+            gridcolor: 'rgba(255,255,255,0.1)'
+        },
+        margin: { t: 20, b: 50, l: 60, r: 20 }
+    };
+
+    Plotly.newPlot('hourlyChart', [trace], layout, {responsive: true});
+} else {
+    document.getElementById('hourlyChart').innerHTML = '<p style="text-align:center; color: #94a3b8; padding: 40px;">No data available for selected filters</p>';
+}
+</script>
+
+{% endblock %}

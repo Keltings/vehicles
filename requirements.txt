@@ -1,0 +1,7 @@
+Django==4.2.8
+plotly==5.18.0
+pandas==2.1.4
+python-decouple==3.8
+xlsxwriter==3.1.9
+openpyxl==3.1.2
+Pillow==10.1.0

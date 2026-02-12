@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+
+{% block title %}Duration Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">⏱️ Duration Analytics</h1>
+    <p class="page-subtitle">Vehicle stay duration patterns</p>
+</div>
+
+<style>
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.stat-box {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+}
+
+.stat-box-label {
+    font-size: 0.85rem;
+    color: var(--text-dark);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+}
+
+.stat-box-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--primary-green);
+    margin-bottom: 8px;
+}
+
+.stat-box-sub {
+    font-size: 0.9rem;
+    color: var(--text-medium);
+}
+
+.chart-container {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 24px;
+}
+
+#durationChart {
+    width: 100%;
+    height: 400px;
+}
+</style>
+
+<div class="stats-grid">
+    <div class="stat-box">
+        <div class="stat-box-label">Short Stay (&lt;1hr)</div>
+        <div class="stat-box-value">{{ under_1h_percent|floatformat:1 }}%</div>
+        <div class="stat-box-sub">{{ under_1h|floatformat:0 }} vehicles</div>
+    </div>
+    
+    <div class="stat-box">
+        <div class="stat-box-label">Medium Stay (1-3hrs)</div>
+        <div class="stat-box-value">{{ between_1_3h_percent|floatformat:1 }}%</div>
+        <div class="stat-box-sub">{{ between_1_3h|floatformat:0 }} vehicles</div>
+    </div>
+    
+    <div class="stat-box">
+        <div class="stat-box-label">Long Stay (3+hrs)</div>
+        <div class="stat-box-value">{{ over_3h_percent|floatformat:1 }}%</div>
+        <div class="stat-box-sub">{{ over_3h|floatformat:0 }} vehicles</div>
+    </div>
+    
+    <div class="stat-box">
+        <div class="stat-box-label">Total Analyzed</div>
+        <div class="stat-box-value">{{ total_analyzed|floatformat:0 }}</div>
+        <div class="stat-box-sub">Completed visits</div>
+    </div>
+</div>
+
+<div class="chart-container">
+    <div id="durationChart"></div>
+</div>
+
+<script>
+var categories = ['Short Stay\n(<1hr)', 'Medium Stay\n(1-3hrs)', 'Long Stay\n(3+hrs)'];
+var values = [{{ under_1h }}, {{ between_1_3h }}, {{ over_3h }}];
+var percentages = [{{ under_1h_percent }}, {{ between_1_3h_percent }}, {{ over_3h_percent }}];
+
+var trace = {
+    x: categories,
+    y: values,
+    type: 'bar',
+    marker: {
+        color: ['#10b981', '#34d399', '#6ee7b7'],
+        opacity: 0.8
+    },
+    text: percentages.map(function(p) { return p.toFixed(1) + '%'; }),
+    textposition: 'outside'
+};
+
+var layout = {
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: '#cbd5e1' },
+    xaxis: {
+        gridcolor: 'rgba(255,255,255,0.1)'
+    },
+    yaxis: {
+        title: 'Number of Vehicles',
+        gridcolor: 'rgba(255,255,255,0.1)'
+    },
+    margin: { t: 40, b: 60, l: 60, r: 20 }
+};
+
+Plotly.newPlot('durationChart', [trace], layout, {responsive: true});
+</script>
+
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}Analytics - Vehicle Intelligence{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">📊 Analytics Dashboard</h1>
+    <p class="page-subtitle">Comprehensive vehicle and site analytics</p>
+</div>
+
+<style>
+.analytics-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+}
+
+.analytics-card {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 16px;
+    padding: 28px;
+    text-decoration: none;
+    color: var(--text-light);
+    transition: all 0.3s ease;
+}
+
+.analytics-card:hover {
+    transform: translateY(-6px);
+    border-color: var(--primary-green);
+    box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);
+}
+
+.analytics-icon {
+    font-size: 2.5rem;
+    color: var(--primary-green);
+    margin-bottom: 16px;
+}
+
+.analytics-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: var(--text-white);
+}
+
+.analytics-desc {
+    font-size: 0.9rem;
+    color: var(--text-medium);
+    line-height: 1.6;
+}
+</style>
+
+<div class="analytics-cards">
+    <a href="{% url 'site_analytics' %}" class="analytics-card">
+        <div class="analytics-icon">
+            <i class="fas fa-map-marked-alt"></i>
+        </div>
+        <h3 class="analytics-title">Site Analytics</h3>
+        <p class="analytics-desc">Compare performance across all parking sites. View traffic, capacity, and utilization metrics.</p>
+    </a>
+
+    <a href="{% url 'time_analytics' %}" class="analytics-card">
+        <div class="analytics-icon">
+            <i class="fas fa-clock"></i>
+        </div>
+        <h3 class="analytics-title">Time Analytics</h3>
+        <p class="analytics-desc">Analyze peak hours, daily patterns, and temporal trends across your network.</p>
+    </a>
+
+    <a href="{% url 'vehicle_type_analytics' %}" class="analytics-card">
+        <div class="analytics-icon">
+            <i class="fas fa-car"></i>
+        </div>
+        <h3 class="analytics-title">Vehicle Type Analytics</h3>
+        <p class="analytics-desc">Distribution of vehicle types, brands, and categories across all locations.</p>
+    </a>
+
+    <a href="{% url 'duration_analytics' %}" class="analytics-card">
+        <div class="analytics-icon">
+            <i class="fas fa-hourglass-half"></i>
+        </div>
+        <h3 class="analytics-title">Duration Analytics</h3>
+        <p class="analytics-desc">Average stay duration, dwell time patterns, and parking behavior analysis.</p>
+    </a>
+</div>
+{% endblock %}
