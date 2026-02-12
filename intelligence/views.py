@@ -2,9 +2,9 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Count, Max, Q, F, ExpressionWrapper, DurationField
+from django.db.models import Count, Max, Q, F, ExpressionWrapper, DurationField,Avg
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime
 from .models import CustomUser, Vehicle, VehicleFlag, AuditLog
 
 def get_client_ip(request):
@@ -569,9 +569,9 @@ def vehicle_detail_api(request, plate_number):
     total_visits = vehicles.count()
     sites_visited = vehicles.values('site_name').distinct().count()
     
-    # Get visit history (last 10)
+    # Get COMPLETE visit history (all visits, not just 10)
     visit_history = []
-    for v in vehicles[:10]:
+    for v in vehicles:  # ALL visits, chronological order
         duration = None
         if v.exit_time and v.entry_time:
             duration_seconds = (v.exit_time - v.entry_time).total_seconds()
@@ -585,6 +585,9 @@ def vehicle_detail_api(request, plate_number):
             'exit': v.exit_time.strftime('%b %d, %Y %H:%M') if v.exit_time else 'Still inside',
             'duration': duration or 'N/A',
             'amount_paid': float(v.amount_paid) if v.amount_paid else 0,
+            'payment_method': v.payment_method or 'N/A',
+            'vehicle_color': v.plate_color or 'Unknown',
+            'vehicle_brand': v.vehicle_brand or 'Unknown',
         })
     
     # Calculate average duration
@@ -706,3 +709,536 @@ def remove_from_watchlist(request, flag_id):
             messages.error(request, 'Vehicle not found in watchlist.')
     
     return redirect('watchlist')
+@login_required
+def analytics_overview(request):
+    """Comprehensive analytics overview with tables and operational insights"""
+    from django.db.models.functions import ExtractHour, TruncDate
+    from datetime import timedelta
+    from collections import defaultdict
+    import json
+    
+    # Get filters
+    date_range = request.GET.get('date_range', '30')
+    selected_site = request.GET.get('site', '')
+    selected_vehicle_type = request.GET.get('vehicle_type', '')
+    
+    # Get date range
+    latest_vehicle = Vehicle.objects.order_by('-entry_time').first()
+    
+    if not latest_vehicle:
+        return render(request, 'analytics/analytics_overview.html', {
+            'unique_vehicles': 0,
+            'cross_site_movements': 0,
+            'avg_dwell_time': '0h 0m',
+            'anomalies': 0,
+            'site_performance': [],
+            'peak_hours': [],
+            'payment_methods': [],
+            'vehicle_distribution': [],
+            'frequent_routes': [],
+            'operational_issues': [],
+        })
+    
+    end_date = latest_vehicle.entry_time.date()
+    
+    if date_range == 'all':
+        start_date = Vehicle.objects.order_by('entry_time').first().entry_time.date()
+        days = (end_date - start_date).days
+    else:
+        days = int(date_range)
+        start_date = end_date - timedelta(days=days)
+    
+    start_datetime = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
+    end_datetime = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
+    
+    # Base queryset with filters
+    base_qs = Vehicle.objects.filter(
+        entry_time__gte=start_datetime,
+        entry_time__lte=end_datetime
+    )
+    
+    if selected_site:
+        base_qs = base_qs.filter(site_name=selected_site)
+    
+    if selected_vehicle_type:
+        base_qs = base_qs.filter(vehicle_type=selected_vehicle_type)
+        
+        # ============================================
+    # SUMMARY STATS (Context-aware based on filters)
+    # ============================================
+    unique_vehicles = base_qs.values('plate_number').distinct().count()
+
+    # Cross-site movements (if site selected, show vehicles that visited this site + others)
+    if selected_site:
+        # Get vehicles that visited the selected site
+        vehicles_at_site = base_qs.filter(site_name=selected_site).values_list('plate_number', flat=True).distinct()
+        
+        # For each vehicle, check if they visited other sites too
+        cross_site_movements = 0
+        for plate in vehicles_at_site:
+            sites_visited = Vehicle.objects.filter(
+                plate_number=plate,
+                entry_time__gte=start_datetime,
+                entry_time__lte=end_datetime
+            ).values('site_name').distinct().count()
+            
+            if sites_visited > 1:
+                cross_site_movements += 1
+        
+        cross_site_percentage = (cross_site_movements / len(vehicles_at_site) * 100) if vehicles_at_site else 0
+    else:
+        # All sites - show vehicles that visited multiple sites
+        vehicle_site_counts = base_qs.values('plate_number').annotate(
+            site_count=Count('site_name', distinct=True)
+        )
+        cross_site_movements = sum(1 for v in vehicle_site_counts if v['site_count'] > 1)
+        cross_site_percentage = (cross_site_movements / unique_vehicles * 100) if unique_vehicles > 0 else 0
+
+    # Average dwell time (context message)
+    vehicles_with_duration = base_qs.filter(exit_time__isnull=False).annotate(
+        duration=ExpressionWrapper(
+            F('exit_time') - F('entry_time'),
+            output_field=DurationField()
+        )
+    )
+
+    avg_dwell_time = '0h 0m'
+    dwell_context = 'No data available'
+
+    if vehicles_with_duration.exists():
+        avg_duration_obj = vehicles_with_duration.aggregate(avg=Avg('duration'))['avg']
+        if avg_duration_obj:
+            avg_hours = int(avg_duration_obj.total_seconds() // 3600)
+            avg_minutes = int((avg_duration_obj.total_seconds() % 3600) // 60)
+            avg_dwell_time = f"{avg_hours}h {avg_minutes}m"
+            
+            # Context message based on filters
+            if selected_site:
+                dwell_context = f'At {selected_site}'
+            else:
+                dwell_context = 'Across all sites'
+
+    # Operational issues
+    anomalies = base_qs.filter(
+        Q(exit_time__isnull=True) |
+        Q(exit_time__gt=F('entry_time') + timedelta(hours=24))
+    ).count()
+
+    # Context messages for cards
+    unique_vehicles_context = f'Last {days} days'
+    if selected_site:
+        unique_vehicles_context = f'At {selected_site}'
+
+    cross_site_context = f'{cross_site_percentage:.1f}% of total'
+
+    anomaly_context = 'Requires attention' if anomalies > 0 else 'All clear'
+    anomaly_color = 'danger' if anomalies > 0 else 'success'
+    
+    # Average dwell time
+    vehicles_with_duration = base_qs.filter(exit_time__isnull=False).annotate(
+        duration=ExpressionWrapper(
+            F('exit_time') - F('entry_time'),
+            output_field=DurationField()
+        )
+    )
+    
+    avg_dwell_time = '0h 0m'
+    if vehicles_with_duration.exists():
+        avg_duration_obj = vehicles_with_duration.aggregate(avg=Avg('duration'))['avg']
+        if avg_duration_obj:
+            avg_hours = int(avg_duration_obj.total_seconds() // 3600)
+            avg_minutes = int((avg_duration_obj.total_seconds() % 3600) // 60)
+            avg_dwell_time = f"{avg_hours}h {avg_minutes}m"
+    
+    # Operational issues
+    anomalies = base_qs.filter(
+        Q(exit_time__isnull=True) |
+        Q(exit_time__gt=F('entry_time') + timedelta(hours=24))
+    ).count()
+    
+    # ============================================
+    # SITE PERFORMANCE TABLE
+    # ============================================
+    site_stats = base_qs.values('site_name').annotate(
+        total_entries=Count('id'),
+        unique_vehicles=Count('plate_number', distinct=True)
+    ).order_by('-total_entries')
+    
+    site_performance = []
+    for site in site_stats:
+        # Calculate average duration for this site
+        site_vehicles = base_qs.filter(
+            site_name=site['site_name'],
+            exit_time__isnull=False
+        ).annotate(
+            duration=ExpressionWrapper(
+                F('exit_time') - F('entry_time'),
+                output_field=DurationField()
+            )
+        )
+        
+        avg_duration = "N/A"
+        if site_vehicles.exists():
+            avg_dur = site_vehicles.aggregate(avg=Avg('duration'))['avg']
+            if avg_dur:
+                hrs = int(avg_dur.total_seconds() // 3600)
+                mins = int((avg_dur.total_seconds() % 3600) // 60)
+                avg_duration = f"{hrs}h {mins}m"
+        
+        # Current occupancy
+        current_occupancy = base_qs.filter(
+            site_name=site['site_name'],
+            exit_time__isnull=True
+        ).count()
+        
+        # Utilization (assume capacity of 500 for now)
+        capacity = 500
+        utilization = int((current_occupancy / capacity) * 100) if capacity > 0 else 0
+        
+        # Status
+        if utilization > 80:
+            status = 'danger'
+        elif utilization > 60:
+            status = 'warning'
+        else:
+            status = 'success'
+        
+        site_performance.append({
+            'site_name': site['site_name'],
+            'total_entries': site['total_entries'],
+            'unique_vehicles': site['unique_vehicles'],
+            'avg_duration': avg_duration,
+            'current_occupancy': current_occupancy,
+            'utilization': utilization,
+            'status': status
+        })
+    
+    # ============================================
+    # PEAK HOURS TABLE
+    # ============================================
+    hourly_data = base_qs.annotate(
+        hour=ExtractHour('entry_time'),
+        day=TruncDate('entry_time')
+    ).values('hour').annotate(
+        total_count=Count('id'),
+        days_count=Count('day', distinct=True)
+    ).order_by('-total_count')[:10]
+    
+    peak_hours = []
+    for h in hourly_data:
+        avg_count = h['total_count'] // h['days_count'] if h['days_count'] > 0 else h['total_count']
+        
+        # Find peak day for this hour
+        peak_day_data = base_qs.filter(
+            entry_time__hour=h['hour']
+        ).annotate(
+            day=TruncDate('entry_time')
+        ).values('day').annotate(
+            count=Count('id')
+        ).order_by('-count').first()
+        
+        peak_day = peak_day_data['day'].strftime('%A') if peak_day_data else 'N/A'
+        
+        peak_hours.append({
+            'hour': h['hour'],
+            'avg_count': avg_count,
+            'peak_day': peak_day
+        })
+    
+    # ============================================
+    # PAYMENT METHODS TABLE
+    # ============================================
+    payment_stats = base_qs.exclude(
+        Q(payment_method__isnull=True) | Q(payment_method='')
+    ).values('payment_method').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    total_payments = sum(p['count'] for p in payment_stats)
+    
+    payment_methods = []
+    payment_methods_chart = []
+    for p in payment_stats:
+        percentage = (p['count'] / total_payments * 100) if total_payments > 0 else 0
+        payment_methods.append({
+            'method': p['payment_method'],
+            'count': p['count'],
+            'percentage': percentage
+        })
+        payment_methods_chart.append({
+            'method': p['payment_method'],
+            'count': p['count']
+        })
+    
+    # ============================================
+    # VEHICLE TYPE DISTRIBUTION TABLE
+    # ============================================
+    type_stats = base_qs.values('vehicle_type').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    total_vehicles = sum(t['count'] for t in type_stats)
+    
+    vehicle_distribution = []
+    vehicle_type_chart = []
+    
+    for t in type_stats:
+        vtype = t['vehicle_type'] or 'Unknown'
+        percentage = (t['count'] / total_vehicles * 100) if total_vehicles > 0 else 0
+        
+        # Calculate avg duration for this type
+        type_vehicles = base_qs.filter(
+            vehicle_type=t['vehicle_type'],
+            exit_time__isnull=False
+        ).annotate(
+            duration=ExpressionWrapper(
+                F('exit_time') - F('entry_time'),
+                output_field=DurationField()
+            )
+        )
+        
+        avg_duration = "N/A"
+        if type_vehicles.exists():
+            avg_dur = type_vehicles.aggregate(avg=Avg('duration'))['avg']
+            if avg_dur:
+                hrs = int(avg_dur.total_seconds() // 3600)
+                mins = int((avg_dur.total_seconds() % 3600) // 60)
+                avg_duration = f"{hrs}h {mins}m"
+        
+        vehicle_distribution.append({
+            'type': vtype,
+            'count': t['count'],
+            'percentage': percentage,
+            'avg_duration': avg_duration
+        })
+        
+        vehicle_type_chart.append({
+            'type': vtype,
+            'count': t['count']
+        })
+    
+    # ============================================
+    # FREQUENT ROUTES TABLE
+    # ============================================
+    # Get vehicles that visited multiple sites
+    multi_site_vehicles = base_qs.values('plate_number').annotate(
+        site_count=Count('site_name', distinct=True)
+    ).filter(site_count__gt=1).values_list('plate_number', flat=True)
+    
+    routes = defaultdict(lambda: {'unique_vehicles': set(), 'total_trips': 0, 'time_diffs': []})
+    
+    for plate in multi_site_vehicles[:1000]:  # Limit to 1000 for performance
+        visits = base_qs.filter(plate_number=plate).order_by('entry_time')
+        
+        prev_visit = None
+        for visit in visits:
+            if prev_visit:
+                route_key = f"{prev_visit.site_name} → {visit.site_name}"
+                routes[route_key]['unique_vehicles'].add(plate)
+                routes[route_key]['total_trips'] += 1
+                
+                # Calculate time between sites
+                time_diff = (visit.entry_time - prev_visit.entry_time).total_seconds()
+                routes[route_key]['time_diffs'].append(time_diff)
+            
+            prev_visit = visit
+    
+    frequent_routes = []
+    for route_key, data in sorted(routes.items(), key=lambda x: len(x[1]['unique_vehicles']), reverse=True)[:10]:
+        avg_time = sum(data['time_diffs']) / len(data['time_diffs']) if data['time_diffs'] else 0
+        avg_hours = int(avg_time // 3600)
+        avg_minutes = int((avg_time % 3600) // 60)
+        
+        from_site, to_site = route_key.split(' → ')
+        
+        frequent_routes.append({
+            'from_site': from_site,
+            'to_site': to_site,
+            'unique_vehicles': len(data['unique_vehicles']),
+            'total_trips': data['total_trips'],
+            'avg_time_between': f"{avg_hours}h {avg_minutes}m"
+        })
+    
+        # ============================================
+    # OPERATIONAL ISSUES TABLE (with pagination)
+    # ============================================
+    operational_issues_all = []
+
+    # No exit records
+    no_exit = base_qs.filter(exit_time__isnull=True).order_by('-entry_time')
+    for v in no_exit:
+        duration = timezone.now() - v.entry_time
+        duration_hours = int(duration.total_seconds() // 3600)
+        
+        operational_issues_all.append({
+            'type': 'No Exit',
+            'severity': 'warning' if duration_hours < 24 else 'danger',
+            'plate': mask_plate_number(v.plate_number),
+            'plate_full': v.plate_number,
+            'site': v.site_name,
+            'entry_time': v.entry_time.strftime('%b %d, %Y %H:%M'),
+            'duration': f"{duration_hours}h ago"
+        })
+
+    # Overstays (>24 hours)
+    overstays = base_qs.filter(
+        exit_time__isnull=False,
+        exit_time__gt=F('entry_time') + timedelta(hours=24)
+    ).order_by('-entry_time')
+
+    for v in overstays:
+        duration = (v.exit_time - v.entry_time).total_seconds()
+        duration_hours = int(duration // 3600)
+        
+        operational_issues_all.append({
+            'type': 'Overstay',
+            'severity': 'danger',
+            'plate': mask_plate_number(v.plate_number),
+            'plate_full': v.plate_number,
+            'site': v.site_name,
+            'entry_time': v.entry_time.strftime('%b %d, %Y %H:%M'),
+            'duration': f"{duration_hours}h total"
+        })
+
+    # Pagination for operational issues (5 per page)
+    issues_page = int(request.GET.get('issues_page', 1))
+    issues_per_page = 5
+    total_issues = len(operational_issues_all)
+    total_pages = (total_issues + issues_per_page - 1) // issues_per_page
+
+    start_idx = (issues_page - 1) * issues_per_page
+    end_idx = start_idx + issues_per_page
+    operational_issues_page = operational_issues_all[start_idx:end_idx]
+    
+    # ============================================
+    # INSIGHTS
+    # ============================================
+    insights = []
+    
+    # Peak site insight
+    if site_performance:
+        busiest = site_performance[0]
+        insights.append(f"{busiest['site_name']} is the busiest site with {busiest['total_entries']} entries")
+    
+    # Cross-site insight
+    if cross_site_percentage > 20:
+        insights.append(f"{cross_site_percentage:.1f}% of vehicles visit multiple sites - consider multi-site passes")
+    
+    # Payment method insight
+    if payment_methods:
+        top_method = payment_methods[0]
+        insights.append(f"{top_method['method']} is the preferred payment method ({top_method['percentage']:.1f}%)")
+    
+    # Get all sites and vehicle types for filters
+    all_sites = Vehicle.objects.values_list('site_name', flat=True).distinct().order_by('site_name')
+    vehicle_types = Vehicle.objects.exclude(
+        Q(vehicle_type__isnull=True) | Q(vehicle_type='')
+    ).values_list('vehicle_type', flat=True).distinct().order_by('vehicle_type')
+    # Dynamic title for frequent routes
+    if date_range == 'all':
+        routes_title = 'Most Frequent Routes (All Time)'
+    elif date_range == '7':
+        routes_title = 'Most Frequent Routes (Last 7 Days)'
+    elif date_range == '90':
+        routes_title = 'Most Frequent Routes (Last 90 Days)'
+    else:
+        routes_title = f'Most Frequent Routes (Last {days} Days)'
+
+    if selected_site:
+        routes_title += f' - From/To {selected_site}'
+    context = {
+        'unique_vehicles': unique_vehicles,
+        'unique_vehicles_context': unique_vehicles_context,
+        'cross_site_movements': cross_site_movements,
+        'cross_site_context': cross_site_context,
+        'avg_dwell_time': avg_dwell_time,
+        'dwell_context': dwell_context,
+        'anomalies': anomalies,
+        'anomaly_context': anomaly_context,
+        'anomaly_color': anomaly_color,
+        'days': days,
+        'date_range': date_range,
+        'selected_site': selected_site,
+        'selected_vehicle_type': selected_vehicle_type,
+        'site_performance': site_performance,
+        'peak_hours': peak_hours,
+        'payment_methods_chart': json.dumps(payment_methods_chart),
+        'vehicle_distribution': vehicle_distribution,
+        'vehicle_type_chart': json.dumps(vehicle_type_chart),
+        'frequent_routes': frequent_routes,
+        'operational_issues_page': operational_issues_page,
+        'current_page': issues_page,
+        'total_pages': total_pages,
+        'total_issues': total_issues,
+        'insights': insights,
+        'all_sites': all_sites,
+        'vehicle_types': vehicle_types,
+        'active_alerts_count': VehicleFlag.objects.filter(is_active=True).count(),
+        'routes_title': routes_title,
+    }
+    return render(request, 'analytics/analytics_overview.html', context)
+
+@login_required
+def route_vehicles_api(request):
+    """API endpoint to get vehicles that traveled a specific route"""
+    from django.http import JsonResponse
+    
+    from_site = request.GET.get('from', '')
+    to_site = request.GET.get('to', '')
+    
+    if not from_site or not to_site:
+        return JsonResponse({'error': 'Missing parameters'}, status=400)
+    
+    # Get all vehicles and track their journeys
+    vehicles_on_route = {}
+    
+    # Get all vehicles that visited both sites
+    plates_at_from = Vehicle.objects.filter(site_name=from_site).values_list('plate_number', flat=True).distinct()
+    plates_at_to = Vehicle.objects.filter(site_name=to_site).values_list('plate_number', flat=True).distinct()
+    
+    # Find common plates
+    common_plates = set(plates_at_from) & set(plates_at_to)
+    
+    for plate in common_plates:
+        # Get all visits for this vehicle
+        visits = Vehicle.objects.filter(plate_number=plate).order_by('entry_time')
+        
+        trip_count = 0
+        time_diffs = []
+        last_trip = None
+        vehicle_type = None
+        
+        prev_visit = None
+        for visit in visits:
+            if not vehicle_type:
+                vehicle_type = visit.vehicle_type or 'Unknown'
+            
+            if prev_visit and prev_visit.site_name == from_site and visit.site_name == to_site:
+                trip_count += 1
+                time_diff = (visit.entry_time - prev_visit.entry_time).total_seconds()
+                time_diffs.append(time_diff)
+                last_trip = visit.entry_time
+            
+            prev_visit = visit
+        
+        if trip_count > 0:
+            avg_time = sum(time_diffs) / len(time_diffs) if time_diffs else 0
+            avg_hours = int(avg_time // 3600)
+            avg_minutes = int((avg_time % 3600) // 60)
+            
+            vehicles_on_route[plate] = {
+                'plate': mask_plate_number(plate),
+                'plate_full': plate,
+                'vehicle_type': vehicle_type,
+                'trip_count': trip_count,
+                'last_trip': last_trip.strftime('%b %d, %Y %H:%M') if last_trip else 'N/A',
+                'avg_time': f"{avg_hours}h {avg_minutes}m"
+            }
+    
+    # Sort by trip count
+    vehicles_list = sorted(vehicles_on_route.values(), key=lambda x: x['trip_count'], reverse=True)
+    
+    return JsonResponse({
+        'vehicles': vehicles_list,
+        'total': len(vehicles_list)
+    })
