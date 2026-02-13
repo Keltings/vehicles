@@ -443,9 +443,22 @@
     </table>
 </div>
 <!-- OPERATIONAL ISSUES -->
+<!-- OPERATIONAL ISSUES -->
 <div class="section">
     <div class="section-header">
         <h2 class="section-title">Operational Issues Requiring Attention</h2>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <input 
+                type="text" 
+                id="issuesSearch" 
+                placeholder="Search by plate, site, or issue type..."
+                style="padding: 8px 16px; background: var(--bg-dark); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; color: var(--text-light); width: 300px;"
+                onkeyup="filterIssuesTable()"
+            >
+            <button class="export-btn">
+                <i class="fas fa-download"></i> Export CSV
+            </button>
+        </div>
     </div>
     
     <table class="data-table">
@@ -721,6 +734,56 @@ document.getElementById('routeModal').addEventListener('click', function(e) {
         closeRouteModal();
     }
 });
+// Search/filter function for operational issues table
+function filterIssuesTable() {
+    const searchInput = document.getElementById('issuesSearch');
+    const filter = searchInput.value.toLowerCase();
+    const table = document.getElementById('issuesTableBody');
+    const rows = table.getElementsByTagName('tr');
+    
+    let visibleCount = 0;
+    
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const cells = row.getElementsByTagName('td');
+        let found = false;
+        
+        // Search in: Issue Type, Plate Number, Site
+        for (let j = 0; j < 3; j++) {
+            if (cells[j]) {
+                const cellText = cells[j].textContent || cells[j].innerText;
+                if (cellText.toLowerCase().indexOf(filter) > -1) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        
+        if (found) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    }
+    
+    // Show "no results" message if needed
+    const noResultsRow = document.getElementById('noIssuesResult');
+    if (noResultsRow) {
+        noResultsRow.remove();
+    }
+    
+    if (visibleCount === 0 && filter !== '') {
+        const newRow = table.insertRow(0);
+        newRow.id = 'noIssuesResult';
+        const cell = newRow.insertCell(0);
+        cell.colSpan = 6;
+        cell.style.textAlign = 'center';
+        cell.style.padding = '40px';
+        cell.style.color = 'var(--text-dark)';
+        cell.innerHTML = '<i class="fas fa-search" style="font-size: 2rem; margin-bottom: 16px; display: block;"></i>No results found for "' + filter + '"';
+    }
+}
 </script>
 
 {% endblock %}
