@@ -1,0 +1,619 @@
+{% extends 'base.html' %}
+
+{% block title %}Vehicle Profiles{% endblock %}
+
+{% block content %}
+<style>
+.page-header {
+    margin-bottom: 32px;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--text-white);
+    margin-bottom: 8px;
+}
+
+.page-subtitle {
+    font-size: 1rem;
+    color: var(--text-medium);
+}
+
+.tabs-container {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    border-bottom: 2px solid rgba(16, 185, 129, 0.2);
+}
+
+.tab {
+    padding: 12px 32px;
+    background: transparent;
+    border: none;
+    color: var(--text-medium);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s;
+}
+
+.tab.active {
+    color: var(--primary-green);
+    border-bottom-color: var(--primary-green);
+}
+
+.tab:hover {
+    color: var(--text-white);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* SEARCH TAB */
+.search-container {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 16px;
+    padding: 48px;
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.search-box {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 32px;
+}
+
+.search-input {
+    flex: 1;
+    padding: 16px 24px;
+    background: var(--bg-dark);
+    border: 2px solid rgba(16, 185, 129, 0.3);
+    border-radius: 12px;
+    color: var(--text-light);
+    font-size: 1.1rem;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--primary-green);
+}
+
+.search-btn {
+    padding: 16px 40px;
+    background: var(--primary-green);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.search-btn:hover {
+    background: var(--green-dark);
+}
+
+.search-result {
+    background: var(--bg-dark);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 16px;
+    padding: 32px;
+    margin-top: 32px;
+}
+
+.result-plate {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--primary-green);
+    margin-bottom: 24px;
+}
+
+.result-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.result-stat {
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-white);
+    margin-bottom: 8px;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: var(--text-dark);
+    text-transform: uppercase;
+}
+
+.view-profile-btn {
+    padding: 14px 32px;
+    background: var(--primary-green);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+/* BROWSE TAB */
+.filters-bar {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 32px;
+    display: flex;
+    gap: 16px;
+    align-items: end;
+}
+
+.filter-group {
+    flex: 1;
+}
+
+.filter-label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-medium);
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.filter-select {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-dark);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 8px;
+    color: var(--text-light);
+    font-size: 0.95rem;
+}
+
+.filter-btn {
+    padding: 10px 24px;
+    background: var(--primary-green);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    height: 42px;
+}
+
+.vehicles-table {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.vehicles-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.vehicles-table th {
+    background: var(--bg-dark);
+    color: var(--text-medium);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 16px;
+    text-align: left;
+    border-bottom: 2px solid rgba(16, 185, 129, 0.3);
+}
+
+.vehicles-table td {
+    padding: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-light);
+}
+
+.vehicles-table tbody tr {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vehicles-table tbody tr:hover {
+    background: rgba(16, 185, 129, 0.1);
+    transform: translateX(4px);
+}
+
+.plate-masked {
+    font-family: monospace;
+    font-weight: 700;
+    color: var(--text-white);
+    letter-spacing: 1px;
+}
+
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.status-active {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--primary-green);
+}
+
+.status-inactive {
+    background: rgba(100, 116, 139, 0.2);
+    color: var(--text-dark);
+}
+
+.status-flagged {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    margin-top: 24px;
+    padding: 20px;
+}
+
+.export-btn {
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid var(--primary-green);
+    border-radius: 8px;
+    color: var(--primary-green);
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.no-results {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-dark);
+}
+
+.no-results i {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    opacity: 0.3;
+}
+</style>
+
+<a href="{% url 'dashboard' %}" class="back-button">
+    <i class="fas fa-arrow-left"></i>
+    Back to Dashboard
+</a>
+
+<div class="page-header">
+    <h1 class="page-title">🚗 Vehicle Profiles</h1>
+    <p class="page-subtitle">Search and analyze individual vehicle activity</p>
+</div>
+
+<!-- TABS -->
+<div class="tabs-container">
+    <button class="tab active" onclick="switchTab('search')">
+        <i class="fas fa-search"></i> Search Vehicle
+    </button>
+    <button class="tab" onclick="switchTab('browse')">
+        <i class="fas fa-list"></i> Browse All
+    </button>
+</div>
+
+<!-- SEARCH TAB -->
+<div id="searchTab" class="tab-content active">
+    <div class="search-container">
+        <h2 style="color: var(--text-white); font-size: 1.5rem; margin-bottom: 16px;">Search by Plate Number</h2>
+        <p style="color: var(--text-medium); margin-bottom: 32px;">Enter a vehicle plate number to view its complete history</p>
+        
+        <form method="get" action="{% url 'vehicle_list' %}" class="search-box">
+            <input type="hidden" name="tab" value="search">
+            <input 
+                type="text" 
+                name="plate" 
+                class="search-input" 
+                placeholder="e.g., KBY028L" 
+                value="{{ search_plate }}"
+                required
+            >
+            <button type="submit" class="search-btn">
+                <i class="fas fa-search"></i> Search
+            </button>
+        </form>
+        
+        {% if search_result %}
+        <div class="search-result">
+            <div class="result-plate">{{ search_result.plate_number }}</div>
+            
+            <div class="result-stats">
+                <div class="result-stat">
+                    <div class="stat-value">{{ search_result.total_visits }}</div>
+                    <div class="stat-label">Total Visits</div>
+                </div>
+                <div class="result-stat">
+                    <div class="stat-value">{{ search_result.sites_visited }}</div>
+                    <div class="stat-label">Sites Visited</div>
+                </div>
+                <div class="result-stat">
+                    <div class="stat-value">{{ search_result.last_seen }}</div>
+                    <div class="stat-label">Last Seen</div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 16px;">
+                <p style="color: var(--text-medium); margin-bottom: 16px;">
+                    <strong>Type:</strong> {{ search_result.vehicle_type }} | 
+                    <strong>Brand:</strong> {{ search_result.vehicle_brand }}
+                </p>
+            </div>
+            
+            <button class="view-profile-btn" onclick="investigateVehicle('{{ search_result.plate_number }}')">
+                <i class="fas fa-eye"></i> View Full Profile
+            </button>
+        </div>
+        {% elif search_plate %}
+        <div class="no-results">
+            <i class="fas fa-search"></i>
+            <h3 style="color: var(--text-white); margin-bottom: 8px;">No Results Found</h3>
+            <p>Vehicle "{{ search_plate }}" not found in database</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- BROWSE ALL TAB -->
+<div id="browseTab" class="tab-content">
+    <form method="get" action="{% url 'vehicle_list' %}" class="filters-bar">
+        <input type="hidden" name="tab" value="browse">
+        
+        <div class="filter-group">
+            <label class="filter-label">Site</label>
+            <select name="site" class="filter-select">
+                <option value="">All Sites</option>
+                {% for site in all_sites %}
+                <option value="{{ site }}" {% if selected_site == site %}selected{% endif %}>{{ site }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="filter-group">
+            <label class="filter-label">Vehicle Type</label>
+            <select name="vehicle_type" class="filter-select">
+                <option value="">All Types</option>
+                {% for vtype in vehicle_types %}
+                <option value="{{ vtype }}" {% if selected_vehicle_type == vtype %}selected{% endif %}>{{ vtype }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="filter-group">
+            <label class="filter-label">Status</label>
+            <select name="status" class="filter-select">
+                <option value="">All Status</option>
+                <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active (Recent)</option>
+                <option value="flagged" {% if selected_status == 'flagged' %}selected{% endif %}>Flagged</option>
+                <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>Inactive (>30 days)</option>
+            </select>
+        </div>
+        
+        <button type="submit" class="filter-btn">
+            <i class="fas fa-filter"></i> Apply
+        </button>
+    </form>
+    
+    <div class="vehicles-table">
+        <div style="padding: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+            <h3 style="color: var(--text-white); font-size: 1.2rem;">
+                All Vehicles ({{ total_vehicles }} total)
+            </h3>
+            <a href="{% url 'export_vehicles' %}" class="export-btn">
+                <i class="fas fa-download"></i> Export CSV
+            </a>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Plate Number</th>
+                    <th>Vehicle Type</th>
+                    <th>Brand</th>
+                    <th>Total Visits</th>
+                    <th>Last Seen</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vehicle in vehicles %}
+                <tr onclick="investigateVehicle('{{ vehicle.plate_number }}')">
+                    <td><span class="plate-masked">{{ vehicle.plate_masked }}</span></td>
+                    <td>{{ vehicle.vehicle_type }}</td>
+                    <td>{{ vehicle.vehicle_brand }}</td>
+                    <td style="font-weight: 600;">{{ vehicle.visit_count }}</td>
+                    <td>{{ vehicle.last_seen }}</td>
+                    <td><span class="status-badge status-{{ vehicle.status }}">{{ vehicle.status|upper }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        {% if total_pages > 1 %}
+        <div class="pagination">
+            <button onclick="window.location.href='?tab=browse&page={{ current_page|add:-1 }}&site={{ selected_site }}&vehicle_type={{ selected_vehicle_type }}&status={{ selected_status }}'" 
+                    class="export-btn" 
+                    {% if current_page == 1 %}disabled style="opacity: 0.5;"{% endif %}>
+                <i class="fas fa-chevron-left"></i> Previous
+            </button>
+            <span style="color: var(--text-light);">Page {{ current_page }} of {{ total_pages }}</span>
+            <button onclick="window.location.href='?tab=browse&page={{ current_page|add:1 }}&site={{ selected_site }}&vehicle_type={{ selected_vehicle_type }}&status={{ selected_status }}'" 
+                    class="export-btn" 
+                    {% if current_page == total_pages %}disabled style="opacity: 0.5;"{% endif %}>
+                Next <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- VEHICLE PROFILE MODAL (reuse from analytics) -->
+<div id="investigateModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: var(--bg-darker); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 20px; max-width: 900px; width: 90%; max-height: 85vh; overflow-y: auto; padding: 32px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+            <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-white);">Vehicle Profile</h2>
+            <button onclick="closeInvestigateModal()" style="background: none; border: none; color: var(--text-dark); font-size: 1.5rem; cursor: pointer;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="investigateContent">
+            <div style="text-align: center; padding: 40px; color: var(--text-dark);">
+                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary-green);"></i>
+                <p style="margin-top: 16px;">Loading vehicle details...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Tab switching
+function switchTab(tabName) {
+    // Update tab buttons
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(tab => tab.classList.remove('active'));
+    event.target.closest('.tab').classList.add('active');
+    
+    // Update tab content
+    const contents = document.querySelectorAll('.tab-content');
+    contents.forEach(content => content.classList.remove('active'));
+    
+    if (tabName === 'search') {
+        document.getElementById('searchTab').classList.add('active');
+    } else {
+        document.getElementById('browseTab').classList.add('active');
+    }
+}
+
+// On page load, check which tab to show
+window.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const activeTab = urlParams.get('tab') || 'search';
+    
+    if (activeTab === 'browse') {
+        document.querySelectorAll('.tab')[1].click();
+    }
+});
+
+// Vehicle investigation modal (reuse from analytics)
+function investigateVehicle(plateNumber) {
+    const modal = document.getElementById('investigateModal');
+    const content = document.getElementById('investigateContent');
+    
+    modal.style.display = 'flex';
+    content.innerHTML = '<div style="text-align: center; padding: 40px;"><i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary-green);"></i><p style="margin-top: 16px; color: var(--text-dark);">Loading vehicle details...</p></div>';
+    
+    fetch('/intelligence/api/vehicle/' + plateNumber + '/')
+        .then(response => response.json())
+        .then(data => {
+            let html = `
+            <div style="display: grid; gap: 24px;">
+                ${data.is_flagged ? `
+                <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); padding: 16px; border-radius: 12px;">
+                    <h4 style="color: #f87171; margin-bottom: 8px;"><i class="fas fa-exclamation-triangle"></i> FLAGGED VEHICLE</h4>
+                    <p style="color: var(--text-light); margin-bottom: 8px;"><strong>Reason:</strong> ${data.flag_info.reason}</p>
+                    <p style="color: var(--text-light); margin-bottom: 8px;"><strong>Priority:</strong> ${data.flag_info.priority}</p>
+                    <p style="color: var(--text-light);"><strong>Details:</strong> ${data.flag_info.description}</p>
+                </div>
+                ` : ''}
+                
+                <div style="background: var(--bg-dark); padding: 20px; border-radius: 12px;">
+                    <h3 style="color: var(--primary-green); margin-bottom: 16px;"><i class="fas fa-car"></i> Vehicle Information</h3>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                        <div><span style="color: var(--text-dark);">Plate:</span> <strong style="color: var(--text-white);">${data.plate_number}</strong></div>
+                        <div><span style="color: var(--text-dark);">Type:</span> <strong style="color: var(--text-white);">${data.vehicle_type}</strong></div>
+                        <div><span style="color: var(--text-dark);">Brand:</span> <strong style="color: var(--text-white);">${data.vehicle_brand}</strong></div>
+                        <div><span style="color: var(--text-dark);">Color:</span> <strong style="color: var(--text-white);">${data.plate_color}</strong></div>
+                        <div><span style="color: var(--text-dark);">First Seen:</span> <strong style="color: var(--text-white);">${data.first_seen}</strong></div>
+                        <div><span style="color: var(--text-dark);">Last Seen:</span> <strong style="color: var(--text-white);">${data.last_seen}</strong></div>
+                    </div>
+                </div>
+                
+                <div style="background: var(--bg-dark); padding: 20px; border-radius: 12px;">
+                    <h3 style="color: var(--primary-green); margin-bottom: 16px;"><i class="fas fa-chart-bar"></i> Activity Summary</h3>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                        <div><span style="color: var(--text-dark);">Total Visits:</span> <strong style="color: var(--text-white);">${data.total_visits}</strong></div>
+                        <div><span style="color: var(--text-dark);">Sites Visited:</span> <strong style="color: var(--text-white);">${data.sites_visited}</strong></div>
+                        <div><span style="color: var(--text-dark);">Most Frequent:</span> <strong style="color: var(--text-white);">${data.most_frequent_site}</strong></div>
+                        <div><span style="color: var(--text-dark);">Avg Duration:</span> <strong style="color: var(--text-white);">${data.avg_duration}</strong></div>
+                    </div>
+                </div>
+                
+                <div style="background: var(--bg-dark); padding: 20px; border-radius: 12px;">
+                    <h3 style="color: var(--primary-green); margin-bottom: 16px;"><i class="fas fa-history"></i> Complete Journey History (${data.visit_history.length} visits)</h3>
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        <table class="data-table" style="font-size: 0.9rem;">
+                            <thead style="position: sticky; top: 0; background: var(--bg-dark); z-index: 10;">
+                                <tr>
+                                    <th>Site</th>
+                                    <th>Entry</th>
+                                    <th>Exit</th>
+                                    <th>Duration</th>
+                                    <th>Amount</th>
+                                    <th>Payment</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.visit_history.map(visit => `
+                                    <tr>
+                                        <td style="font-weight: 600;">${visit.site}</td>
+                                        <td>${visit.entry}</td>
+                                        <td>${visit.exit}</td>
+                                        <td style="color: var(--primary-green);">${visit.duration}</td>
+                                        <td>KSh ${visit.amount_paid.toLocaleString()}</td>
+                                        <td><span style="padding: 2px 8px; background: rgba(16, 185, 129, 0.2); border-radius: 4px; font-size: 0.8rem;">${visit.payment_method}</span></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            `;
+            
+            content.innerHTML = html;
+        })
+        .catch(error => {
+            content.innerHTML = '<div style="text-align: center; padding: 40px; color: #f87171;"><i class="fas fa-exclamation-circle" style="font-size: 2rem;"></i><p style="margin-top: 16px;">Error loading vehicle details</p></div>';
+            console.error('Error:', error);
+        });
+}
+
+function closeInvestigateModal() {
+    document.getElementById('investigateModal').style.display = 'none';
+}
+
+// Close on outside click
+document.getElementById('investigateModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeInvestigateModal();
+    }
+});
+</script>
+
+{% endblock %}

@@ -99,3 +99,26 @@ LOGOUT_REDIRECT_URL = '/intelligence/login/'
 # Session
 SESSION_COOKIE_AGE = 7200  # 2 hours
 SESSION_SAVE_EVERY_REQUEST = True
+
+# Email Configuration (for alert notifications)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'  # Change to your SMTP server
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'lkelida@gmail.com'  # Change this
+EMAIL_HOST_PASSWORD = 'your-app-password'  # Change this
+DEFAULT_FROM_EMAIL = 'Vehicle Intelligence System <noreply@yourdomain.com>'
+
+# For development, use console backend (prints emails to console)
+# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# Email Configuration (Development - prints to console)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = 'Vehicle Intelligence System <noreply@yourdomain.com>'
+
+
+# SMS Configuration (Africa's Talking)
+AFRICASTALKING_USERNAME = 'sandbox'  # Change to your username for production
+AFRICASTALKING_API_KEY = 'your-api-key-here'  # Get from https://africastalking.com
+
+# For testing, use sandbox mode
+# For production, get real credentials from Africa's Talking

@@ -1,38 +1,6 @@
-{% extends 'base_with_sidebar.html' %}
-
+{% extends 'base.html' %}
 {% block title %}Analytics - Vehicle Intelligence{% endblock %}
 
-{% block sidebar %}
-<div class="sidebar">
-    <div class="sidebar-section">
-        <div class="sidebar-title">Analytics</div>
-        <a href="{% url 'analytics_overview' %}" class="sidebar-item active">
-            <i class="fas fa-chart-line"></i>
-            <span>Overview</span>
-        </a>
-        <a href="{% url 'site_analytics' %}" class="sidebar-item">
-            <i class="fas fa-building"></i>
-            <span>Sites</span>
-        </a>
-        <a href="{% url 'time_analytics' %}" class="sidebar-item">
-            <i class="fas fa-clock"></i>
-            <span>Time & Routes</span>
-        </a>
-        <a href="{% url 'vehicle_type_analytics' %}" class="sidebar-item">
-            <i class="fas fa-car"></i>
-            <span>Vehicle Types</span>
-        </a>
-        <a href="{% url 'duration_analytics' %}" class="sidebar-item">
-            <i class="fas fa-hourglass-half"></i>
-            <span>Duration</span>
-        </a>
-        <a href="#" class="sidebar-item">
-            <i class="fas fa-map-marked-alt"></i>
-            <span>Site Intelligence</span>
-        </a>
-    </div>
-</div>
-{% endblock %}
 
 {% block content %}
 <a href="{% url 'dashboard' %}" class="back-button">
@@ -46,6 +14,33 @@
 </div>
 
 <style>
+.plate-masked {
+    font-family: monospace;
+    font-weight: 700;
+    color: var(--text-white);
+    letter-spacing: 1px;
+}
+
+.view-plate-btn {
+    padding: 2px 8px;
+    background: transparent;
+    border: 1px solid var(--primary-green);
+    border-radius: 4px;
+    color: var(--primary-green);
+    cursor: pointer;
+    font-size: 0.75rem;
+    margin-left: 8px;
+    transition: all 0.2s;
+}
+
+.view-plate-btn:hover {
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.plate-revealed {
+    color: var(--primary-green);
+    font-weight: 700;
+}    
 .filters-bar {
     background: var(--bg-darker);
     border: 1px solid rgba(16, 185, 129, 0.2);
@@ -301,9 +296,9 @@
 <div class="section">
     <div class="section-header">
         <h2 class="section-title">Site Performance Comparison</h2>
-        <button class="export-btn">
+        <a href="{% url 'export_site_performance' %}" class="export-btn" style="text-decoration: none;">
             <i class="fas fa-download"></i> Export CSV
-        </button>
+        </a>
     </div>
     
     <table class="data-table">
@@ -370,9 +365,9 @@
 <div class="section">
     <div class="section-header">
         <h2 class="section-title">Vehicle Type Distribution</h2>
-        <button class="export-btn">
+        <a href="{% url 'export_vehicle_types' %}" class="export-btn" style="text-decoration: none;">
             <i class="fas fa-download"></i> Export CSV
-        </button>
+        </a>
     </div>
     
     <div style="margin-bottom: 16px; color: var(--text-medium); font-size: 0.9rem;">
@@ -455,9 +450,9 @@
                 style="padding: 8px 16px; background: var(--bg-dark); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; color: var(--text-light); width: 300px;"
                 onkeyup="filterIssuesTable()"
             >
-            <button class="export-btn">
+            <a href="{% url 'export_operational_issues' %}" class="export-btn" style="text-decoration: none;">
                 <i class="fas fa-download"></i> Export CSV
-            </button>
+            </a>
         </div>
     </div>
     
@@ -476,7 +471,12 @@
             {% for issue in operational_issues_page %}
             <tr>
                 <td><span class="badge badge-{{ issue.severity }}">{{ issue.type }}</span></td>
-                <td style="font-weight: 600;">{{ issue.plate }}</td>
+                <td>
+                    <span class="plate-masked" id="plate-{{ forloop.counter }}">{{ issue.plate }}</span>
+                    <button class="view-plate-btn" onclick="viewFullPlate('{{ issue.plate_full }}', 'plate-{{ forloop.counter }}', 'Operational Issues Table')">
+                        <i class="fas fa-eye"></i> View
+                    </button>
+                </td>
                 <td>{{ issue.site }}</td>
                 <td>{{ issue.entry_time }}</td>
                 <td>{{ issue.duration }}</td>
@@ -696,10 +696,15 @@ function showRouteVehicles(fromSite, toSite) {
                     <tbody>
                 `;
                 
-                data.vehicles.forEach(function(vehicle) {
+                data.vehicles.forEach(function(vehicle, index) {
                     html += `
                         <tr>
-                            <td style="font-weight: 600;">${vehicle.plate}</td>
+                            <td>
+                                <span class="plate-masked" id="route-plate-${index}">${vehicle.plate}</span>
+                                <button class="view-plate-btn" onclick="viewFullPlate('${vehicle.plate_full}', 'route-plate-${index}', 'Frequent Routes')">
+                                    <i class="fas fa-eye"></i> View
+                                </button>
+                            </td>
                             <td>${vehicle.vehicle_type}</td>
                             <td>${vehicle.trip_count}</td>
                             <td>${vehicle.last_trip}</td>
@@ -783,6 +788,66 @@ function filterIssuesTable() {
         cell.style.color = 'var(--text-dark)';
         cell.innerHTML = '<i class="fas fa-search" style="font-size: 2rem; margin-bottom: 16px; display: block;"></i>No results found for "' + filter + '"';
     }
+}// View full plate number with audit logging
+function viewFullPlate(fullPlate, elementId, source) {
+    if (confirm('View full plate number? This action will be logged.')) {
+        const element = document.getElementById(elementId);
+        
+        // Send audit log to backend
+        fetch('/intelligence/api/audit-plate-view/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                plate_number: fullPlate,
+                source: source
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Reveal the plate
+                element.textContent = fullPlate;
+                element.classList.add('plate-revealed');
+                
+                // Remove the button
+                const btn = element.nextElementSibling;
+                if (btn && btn.classList.contains('view-plate-btn')) {
+                    btn.remove();
+                }
+                
+                // Show success message briefly
+                const msg = document.createElement('span');
+                msg.style.color = 'var(--text-dark)';
+                msg.style.fontSize = '0.75rem';
+                msg.style.marginLeft = '8px';
+                msg.textContent = '(Logged)';
+                element.parentNode.appendChild(msg);
+            }
+        })
+        .catch(error => {
+            console.error('Error logging plate view:', error);
+            alert('Error logging access. Please try again.');
+        });
+    }
+}
+
+// Get CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
 }
 </script>
 

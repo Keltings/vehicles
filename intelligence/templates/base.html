@@ -352,6 +352,8 @@
     </style>
 </head>
 <body>
+    <body>
+    
     <!-- SIDEBAR -->
     <div class="sidebar">
         <div class="sidebar-header">
@@ -381,13 +383,17 @@
                 <i class="fas fa-bell"></i>
                 <span>Alerts</span>
             </a>
-            <a href="#" class="menu-item">
+            <a href="{% url 'alerts_center' %}?tab=rules" class="menu-item">
                 <i class="fas fa-eye"></i>
-                <span>Watchlist</span>
+                <span>Custom Rules</span>
             </a>
-            <a href="#" class="menu-item">
+            <a href="{% url 'site_intelligence' %}" class="menu-item">
                 <i class="fas fa-map-marker-alt"></i>
                 <span>Site Intelligence</span>
+            </a>
+            <a href="{% url 'audit_logs' %}" class="menu-item">
+                <i class="fas fa-shield-alt"></i>
+                <span>Audit Logs</span>
             </a>
         </nav>
     </div>
@@ -396,10 +402,17 @@
     <div class="main-content">
         <!-- TOP BAR -->
         <div class="topbar">
-            <div class="search-bar">
-                <i class="fas fa-search"></i>
-                <input type="text" placeholder="Search plate number..." id="globalSearch">
-            </div>
+            <div class="search-bar" style="position: relative;">
+    <i class="fas fa-search"></i>
+    <input 
+        type="text" 
+        id="globalSearch" 
+        placeholder="Search plate number..." 
+        autocomplete="off"
+        onkeyup="globalSearchVehicle(event)"
+    >
+    <div id="searchResults" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-darker); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; margin-top: 8px; max-height: 400px; overflow-y: auto; z-index: 10000; box-shadow: 0 8px 24px rgba(0,0,0,0.5);"></div>
+</div>
             
             <div class="topbar-right">
                 <a href="#" class="alert-button">
@@ -433,6 +446,106 @@
         }, 2 * 60 * 60 * 1000);
         
         {% block extra_js %}{% endblock %}
+
+// Global search functionality
+let searchTimeout;
+
+function globalSearchVehicle(event) {
+    const query = event.target.value.trim().toUpperCase();
+    const resultsDiv = document.getElementById('searchResults');
+    
+    // Clear previous timeout
+    clearTimeout(searchTimeout);
+    
+    if (query.length < 2) {
+        resultsDiv.style.display = 'none';
+        return;
+    }
+    
+    // Show loading
+    resultsDiv.style.display = 'block';
+    resultsDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-dark);"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+    
+    // Debounce search
+    searchTimeout = setTimeout(() => {
+        fetch('/intelligence/api/search-vehicles/?q=' + encodeURIComponent(query))
+            .then(response => response.json())
+            .then(data => {
+                if (data.results && data.results.length > 0) {
+                    let html = '<div style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-dark); font-size: 0.85rem;">Found ' + data.results.length + ' vehicle(s)</div>';
+                    
+                    data.results.forEach(vehicle => {
+                        html += `
+                            <div onclick="viewVehicleFromSearch('${vehicle.plate_number}')" style="padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(16,185,129,0.1)'" onmouseout="this.style.background='transparent'">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <div style="font-weight: 700; color: var(--text-white); margin-bottom: 4px; font-family: monospace; letter-spacing: 1px;">
+                                            ${vehicle.plate_masked}
+                                        </div>
+                                        <div style="font-size: 0.85rem; color: var(--text-medium);">
+                                            ${vehicle.vehicle_type} • ${vehicle.vehicle_brand}
+                                        </div>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <div style="color: var(--primary-green); font-weight: 600; margin-bottom: 4px;">
+                                            ${vehicle.visit_count} visits
+                                        </div>
+                                        <div style="font-size: 0.85rem; color: var(--text-dark);">
+                                            ${vehicle.last_seen}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '<div style="padding: 12px; text-align: center;"><a href="/intelligence/vehicles/?tab=search&plate=' + query + '" style="color: var(--primary-green); text-decoration: none; font-size: 0.9rem;">View all results →</a></div>';
+                    
+                    resultsDiv.innerHTML = html;
+                } else {
+                    resultsDiv.innerHTML = `
+                        <div style="padding: 40px; text-align: center;">
+                            <i class="fas fa-search" style="font-size: 2rem; color: var(--text-dark); opacity: 0.3; margin-bottom: 12px; display: block;"></i>
+                            <div style="color: var(--text-medium); font-size: 0.95rem;">No vehicles found for "${query}"</div>
+                            <a href="/intelligence/vehicles/?tab=browse" style="display: inline-block; margin-top: 12px; color: var(--primary-green); text-decoration: none; font-size: 0.9rem;">Browse all vehicles →</a>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                resultsDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: #f87171;">Error searching. Please try again.</div>';
+            });
+    }, 300); // 300ms debounce
+}
+
+function viewVehicleFromSearch(plateNumber) {
+    // Close search results
+    document.getElementById('searchResults').style.display = 'none';
+    document.getElementById('globalSearch').value = '';
+    
+    // Check if investigateVehicle function exists (it will on analytics/vehicles pages)
+    if (typeof investigateVehicle === 'function') {
+        investigateVehicle(plateNumber);
+    } else {
+        // Redirect to vehicle profiles page with search
+        window.location.href = '/intelligence/vehicles/?tab=search&plate=' + plateNumber;
+    }
+}
+
+// Close search results when clicking outside
+document.addEventListener('click', function(event) {
+    const searchBar = document.querySelector('.search-bar');
+    const resultsDiv = document.getElementById('searchResults');
+    
+    if (searchBar && !searchBar.contains(event.target)) {
+        resultsDiv.style.display = 'none';
+    }
+});
+
+// Prevent search results from closing when clicking inside
+document.getElementById('searchResults').addEventListener('click', function(event) {
+    event.stopPropagation();
+});
     </script>
 </body>
 </html>

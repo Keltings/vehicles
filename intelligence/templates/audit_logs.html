@@ -1,0 +1,287 @@
+{% extends 'base.html' %}
+
+{% block title %}Audit Logs{% endblock %}
+
+{% block content %}
+<style>
+.page-header {
+    margin-bottom: 32px;
+}
+
+.page-title {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--text-white);
+    margin-bottom: 8px;
+}
+
+.page-subtitle {
+    font-size: 1rem;
+    color: var(--text-medium);
+}
+
+.filters-bar {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 32px;
+    display: flex;
+    gap: 16px;
+    align-items: end;
+}
+
+.filter-group {
+    flex: 1;
+}
+
+.filter-label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-medium);
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.filter-select, .filter-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-dark);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 8px;
+    color: var(--text-light);
+    font-size: 0.95rem;
+}
+
+.filter-btn {
+    padding: 10px 24px;
+    background: var(--primary-green);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    height: 42px;
+}
+
+.stats-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 32px;
+}
+
+.stat-card {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary-green);
+    margin-bottom: 8px;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: var(--text-medium);
+}
+
+.logs-table {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.logs-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.logs-table th {
+    background: var(--bg-dark);
+    color: var(--text-medium);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 16px;
+    text-align: left;
+    border-bottom: 2px solid rgba(16, 185, 129, 0.3);
+}
+
+.logs-table td {
+    padding: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-light);
+}
+
+.logs-table tr:hover {
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.action-badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--primary-green);
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 24px;
+    padding: 20px;
+}
+
+.export-btn {
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid var(--primary-green);
+    border-radius: 8px;
+    color: var(--primary-green);
+    cursor: pointer;
+    text-decoration: none;
+}
+</style>
+
+<a href="{% url 'dashboard' %}" class="back-button">
+    <i class="fas fa-arrow-left"></i>
+    Back to Dashboard
+</a>
+
+<div class="page-header">
+    <h1 class="page-title">🔒 Audit Logs</h1>
+    <p class="page-subtitle">Track all plate number access and system activities</p>
+</div>
+
+<!-- FILTERS -->
+<form method="get" class="filters-bar">
+    <div class="filter-group">
+        <label class="filter-label">User</label>
+        <select name="user" class="filter-select">
+            <option value="">All Users</option>
+            {% for user in all_users %}
+            <option value="{{ user.id }}" {% if selected_user == user.id|stringformat:"s" %}selected{% endif %}>
+                {{ user.username }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div class="filter-group">
+    <label class="filter-label">Action</label>
+    <select name="action" class="filter-select">
+        <option value="">All Actions</option>
+        <option value="view_plate" {% if selected_action == 'view_plate' %}selected{% endif %}>View Plate</option>
+        <option value="search_vehicle" {% if selected_action == 'search_vehicle' %}selected{% endif %}>Search Vehicle</option>
+        <option value="view_vehicle_profile" {% if selected_action == 'view_vehicle_profile' %}selected{% endif %}>View Profile</option>
+        <option value="search_vehicle_profiles" {% if selected_action == 'search_vehicle_profiles' %}selected{% endif %}>Search Profiles</option>
+        <option value="create_alert" {% if selected_action == 'create_alert' %}selected{% endif %}>Create Alert</option>
+        <option value="resolve_alert" {% if selected_action == 'resolve_alert' %}selected{% endif %}>Resolve Alert</option>
+        <option value="login" {% if selected_action == 'login' %}selected{% endif %}>Login</option>
+        <option value="logout" {% if selected_action == 'logout' %}selected{% endif %}>Logout</option>
+    </select>
+</div>
+    
+    <div class="filter-group">
+        <label class="filter-label">Date From</label>
+        <input type="date" name="date_from" class="filter-input" value="{{ date_from }}">
+    </div>
+
+    
+    <div class="filter-group">
+        <label class="filter-label">Date To</label>
+        <input type="date" name="date_to" class="filter-input" value="{{ date_to }}">
+    </div>
+    <div class="filter-group">
+    <label class="filter-label">Search Details</label>
+    <input type="text" name="search" class="filter-input" placeholder="Search in details..." value="{{ search_query }}">
+</div>
+    
+    <button type="submit" class="filter-btn">
+        <i class="fas fa-filter"></i> Apply
+    </button>
+</form>
+
+<!-- STATS -->
+<div class="stats-cards">
+    <div class="stat-card">
+        <div class="stat-value">{{ total_logs }}</div>
+        <div class="stat-label">Total Logs</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ plate_views }}</div>
+        <div class="stat-label">Plate Views</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ unique_users }}</div>
+        <div class="stat-label">Active Users</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ today_logs }}</div>
+        <div class="stat-label">Today's Activity</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ searches }}</div>
+        <div class="stat-label">Searches</div>
+    </div>
+</div>
+
+<!-- LOGS TABLE -->
+<div class="logs-table">
+    <div style="padding: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+        <h3 style="color: var(--text-white); font-size: 1.2rem;">Recent Activity</h3>
+        <a href="{% url 'export_audit_logs' %}" class="export-btn">
+            <i class="fas fa-download"></i> Export CSV
+        </a>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Details</th>
+                <th>IP Address</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td style="font-weight: 600;">{{ log.timestamp|date:"M d, Y H:i:s" }}</td>
+                <td>{{ log.user.username }}</td>
+                <td><span class="action-badge">{{ log.action }}</span></td>
+                <td style="max-width: 400px;">{{ log.details }}</td>
+                <td style="font-family: monospace; color: var(--text-dark);">{{ log.ip_address }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    {% if total_pages > 1 %}
+    <div class="pagination">
+        <button onclick="window.location.href='?page={{ current_page|add:-1 }}&user={{ selected_user }}&action={{ selected_action }}&date_from={{ date_from }}&date_to={{ date_to }}'" 
+                class="export-btn" 
+                {% if current_page == 1 %}disabled style="opacity: 0.5;"{% endif %}>
+            <i class="fas fa-chevron-left"></i> Previous
+        </button>
+        <span style="color: var(--text-light);">Page {{ current_page }} of {{ total_pages }}</span>
+        <button onclick="window.location.href='?page={{ current_page|add:1 }}&user={{ selected_user }}&action={{ selected_action }}&date_from={{ date_from }}&date_to={{ date_to }}'" 
+                class="export-btn" 
+                {% if current_page == total_pages %}disabled style="opacity: 0.5;"{% endif %}>
+            Next <i class="fas fa-chevron-right"></i>
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

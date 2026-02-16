@@ -3,82 +3,244 @@
 {% block title %}Alerts Center{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1 class="page-title">🔔 Alerts Center</h1>
-    <p class="page-subtitle">Manage vehicle alerts and flags</p>
-</div>
-
 <style>
-.top-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
+.page-header {
+    margin-bottom: 32px;
 }
 
-.add-alert-btn {
-    padding: 12px 24px;
-    background: var(--primary-green);
-    border: none;
-    border-radius: 12px;
-    color: white;
-    font-weight: 700;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
+.page-title {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--text-white);
+    margin-bottom: 8px;
 }
 
-.alert-card {
+.page-subtitle {
+    font-size: 1rem;
+    color: var(--text-medium);
+}
+
+/* Stats Cards */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 32px;
+}
+
+.stat-card {
     background: var(--bg-darker);
-    border-left: 4px solid var(--primary-green);
-    border-radius: 12px;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 16px;
     padding: 24px;
+    text-align: center;
+}
+
+.stat-card.critical {
+    border-color: rgba(239, 68, 68, 0.5);
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.stat-card.high {
+    border-color: rgba(245, 158, 11, 0.5);
+    background: rgba(245, 158, 11, 0.05);
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 8px;
+}
+
+.stat-value.critical { color: #ef4444; }
+.stat-value.high { color: #f59e0b; }
+.stat-value.medium { color: #3b82f6; }
+.stat-value.low { color: var(--primary-green); }
+
+.stat-label {
+    font-size: 0.85rem;
+    color: var(--text-medium);
+    text-transform: uppercase;
+}
+
+/* Charts */
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+.chart-card {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 16px;
+    padding: 24px;
+}
+
+.chart-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-white);
     margin-bottom: 20px;
 }
 
-.alert-card.priority-high {
-    border-left-color: #ef4444;
-}
-
-.alert-card.priority-medium {
-    border-left-color: #f59e0b;
-}
-
-.alert-card.priority-low {
-    border-left-color: #10b981;
-}
-
-.alert-header {
+/* Tabs */
+.tabs-container {
     display: flex;
-    justify-content: space-between;
-    align-items: start;
-    margin-bottom: 16px;
+    gap: 8px;
+    margin-bottom: 32px;
+    border-bottom: 2px solid rgba(16, 185, 129, 0.2);
 }
 
-.alert-plate {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--text-white);
+.tab {
+    padding: 12px 24px;
+    background: transparent;
+    border: none;
+    color: var(--text-medium);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s;
+}
+
+.tab.active {
+    color: var(--primary-green);
+    border-bottom-color: var(--primary-green);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Filters */
+.filters-bar {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    display: flex;
+    gap: 16px;
+    align-items: end;
+}
+
+.filter-group {
+    flex: 1;
+}
+
+.filter-label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-medium);
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.filter-select {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-dark);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 8px;
+    color: var(--text-light);
+}
+
+/* Bulk Actions */
+.bulk-actions-bar {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 12px;
+    padding: 16px 24px;
+    margin-bottom: 24px;
+    display: none;
+    align-items: center;
+    gap: 16px;
+}
+
+.bulk-actions-bar.active {
+    display: flex;
+}
+
+.bulk-btn {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.bulk-btn.resolve {
+    background: var(--primary-green);
+    color: white;
+}
+
+.bulk-btn.delete {
+    background: #ef4444;
+    color: white;
+}
+
+/* Alerts Table */
+.alerts-table {
+    background: var(--bg-darker);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.alerts-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.alerts-table th {
+    background: var(--bg-dark);
+    color: var(--text-medium);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 16px;
+    text-align: left;
+    border-bottom: 2px solid rgba(16, 185, 129, 0.3);
+}
+
+.alerts-table td {
+    padding: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-light);
+}
+
+.alerts-table tr:hover {
+    background: rgba(16, 185, 129, 0.05);
 }
 
 .priority-badge {
-    padding: 6px 16px;
-    border-radius: 20px;
-    font-size: 0.8rem;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
 }
 
-.priority-high {
+.priority-critical {
     background: rgba(239, 68, 68, 0.2);
-    color: #f87171;
+    color: #ef4444;
+}
+
+.priority-high {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
 }
 
 .priority-medium {
-    background: rgba(245, 158, 11, 0.2);
-    color: #fbbf24;
+    background: rgba(59, 130, 246, 0.2);
+    color: #3b82f6;
 }
 
 .priority-low {
@@ -86,165 +248,49 @@
     color: var(--primary-green);
 }
 
-.alert-body {
-    display: grid;
-    gap: 12px;
-    margin-bottom: 16px;
-}
-
-.alert-row {
-    display: flex;
-    gap: 8px;
-}
-
-.alert-label {
-    font-size: 0.85rem;
-    color: var(--text-dark);
-    font-weight: 600;
-}
-
-.alert-value {
-    font-size: 0.95rem;
-    color: var(--text-light);
-}
-
-.alert-actions {
-    display: flex;
-    gap: 12px;
-}
-
-.btn-action {
-    padding: 8px 16px;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    font-weight: 600;
+.action-btn {
+    padding: 6px 12px;
+    background: transparent;
+    border: 1px solid var(--primary-green);
+    border-radius: 6px;
+    color: var(--primary-green);
     cursor: pointer;
-    border: none;
+    font-size: 0.85rem;
+    margin-right: 8px;
 }
 
-.btn-resolve {
+.action-btn:hover {
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.action-btn.danger {
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+/* Create Alert Button */
+.create-alert-btn {
+    position: fixed;
+    bottom: 100px;
+    right: 32px;
+    width: 64px;
+    height: 64px;
     background: var(--primary-green);
+    border: none;
+    border-radius: 50%;
     color: white;
-}
-
-.btn-view {
-    background: var(--bg-dark);
-    color: var(--text-light);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
-.no-alerts {
-    background: var(--bg-darker);
-    border: 1px solid rgba(16, 185, 129, 0.2);
-    border-radius: 12px;
-    padding: 60px;
-    text-align: center;
-}
-
-.no-alerts i {
-    font-size: 4rem;
-    color: var(--text-dark);
-    margin-bottom: 20px;
-    opacity: 0.3;
-}
-.btn-action {
+    font-size: 1.5rem;
     cursor: pointer;
-    transition: all 0.2s ease;
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+    z-index: 1000;
+    transition: all 0.3s;
 }
 
-.btn-action:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+.create-alert-btn:hover {
+    transform: scale(1.1);
 }
 
-.btn-resolve:hover {
-    background: var(--green-dark);
-}
-
-.btn-view:hover {
-    background: var(--bg-darker);
-    border-color: var(--primary-green);
-}
-</style>
-
-<div class="top-bar">
-    <div>
-        <h2 style="color: var(--text-white); font-size: 1.3rem; margin-bottom: 8px;">Active Alerts</h2>
-        <p style="color: var(--text-dark);">{{ active_alerts|length }} alert(s) requiring attention</p>
-    </div>
-    <a href="{% url 'watchlist' %}" class="add-alert-btn">
-        <i class="fas fa-plus"></i> Add to Watchlist
-    </a>
-</div>
-
-{% if active_alerts %}
-    {% for alert in active_alerts %}
-    <div class="alert-card priority-{{ alert.priority }}">
-        <div class="alert-header">
-            <div class="alert-plate">{{ alert.plate_number }}</div>
-            <span class="priority-badge priority-{{ alert.priority }}">
-                {{ alert.get_priority_display }}
-            </span>
-        </div>
-        
-        <div class="alert-body">
-            <div class="alert-row">
-                <span class="alert-label">Reason:</span>
-                <span class="alert-value">{{ alert.get_reason_display }}</span>
-            </div>
-            <div class="alert-row">
-                <span class="alert-label">Description:</span>
-                <span class="alert-value">{{ alert.description }}</span>
-            </div>
-            <div class="alert-row">
-                <span class="alert-label">Flagged by:</span>
-                <span class="alert-value">{{ alert.flagged_by.username }}</span>
-            </div>
-            <div class="alert-row">
-                <span class="alert-label">Created:</span>
-                <span class="alert-value">{{ alert.created_at|date:"M d, Y H:i" }}</span>
-            </div>
-        </div>
-        
-        <div class="alert-actions">
-            <form method="post" action="{% url 'resolve_alert' alert.id %}" style="display: inline;">
-                {% csrf_token %}
-                <button type="submit" class="btn-action btn-resolve" onclick="return confirm('Mark this alert as resolved?')">
-                    <i class="fas fa-check"></i> Mark Resolved
-                </button>
-            </form>
-            <button class="btn-action btn-view" onclick="viewVehicle('{{ alert.plate_number }}')">
-                <i class="fas fa-eye"></i> View Vehicle
-            </button>
-        </div>
-    </div>
-    {% endfor %}
-{% else %}
-<div class="no-alerts">
-    <i class="fas fa-check-circle"></i>
-    <h3 style="color: var(--text-white); margin-bottom: 8px;">No Active Alerts</h3>
-    <p style="color: var(--text-dark);">All clear! No vehicles flagged at the moment.</p>
-</div>
-{% endif %}
-<!-- VEHICLE DETAIL MODAL -->
-<div id="vehicleModal" class="modal">
-    <div class="modal-content" style="max-width: 900px;">
-        <div class="modal-header">
-            <h2 class="modal-title" id="modalPlate">Vehicle Details</h2>
-            <button class="modal-close" onclick="closeVehicleModal()">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <div id="vehicleDetails">
-            <div style="text-align: center; padding: 40px; color: var(--text-dark);">
-                <i class="fas fa-spinner fa-spin" style="font-size: 2rem;"></i>
-                <p style="margin-top: 16px;">Loading vehicle details...</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<style>
+/* Modal */
 .modal {
     display: none;
     position: fixed;
@@ -252,315 +298,817 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.85);
-    z-index: 9999;
+    background: rgba(0,0,0,0.85);
+    z-index: 10000;
     align-items: center;
     justify-content: center;
-}
-
-.modal.active {
-    display: flex;
 }
 
 .modal-content {
     background: var(--bg-darker);
     border: 1px solid rgba(16, 185, 129, 0.3);
     border-radius: 20px;
+    max-width: 600px;
     width: 90%;
     max-height: 85vh;
     overflow-y: auto;
     padding: 32px;
 }
 
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.modal-close {
-    background: none;
-    border: none;
-    color: var(--text-dark);
-    font-size: 1.5rem;
-    cursor: pointer;
-}
-
-.detail-section {
-    margin-bottom: 28px;
-}
-
-.section-title {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--primary-green);
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-    background: var(--bg-dark);
-    padding: 20px;
-    border-radius: 12px;
-}
-
-.info-item {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.info-label {
-    font-size: 0.8rem;
-    color: var(--text-dark);
-    text-transform: uppercase;
-    font-weight: 600;
-}
-
-.info-value {
-    font-size: 1.05rem;
-    color: var(--text-white);
-    font-weight: 600;
-}
-
-.visit-timeline {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.visit-item {
-    background: var(--bg-dark);
-    border-left: 3px solid var(--primary-green);
-    padding: 16px;
-    border-radius: 8px;
-}
-
-.visit-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-}
-
-.visit-site {
-    font-weight: 700;
-    color: var(--text-white);
-    font-size: 1.05rem;
-}
-
-.visit-duration {
-    color: var(--primary-green);
-    font-weight: 600;
-}
-
-.visit-times {
-    font-size: 0.9rem;
-    color: var(--text-medium);
-}
-
-.risk-badge {
-    display: inline-block;
-    padding: 8px 16px;
-    border-radius: 12px;
-    font-weight: 700;
-    font-size: 0.95rem;
-}
-
-.risk-low {
-    background: rgba(16, 185, 129, 0.2);
-    color: var(--primary-green);
-}
-
-.risk-medium {
-    background: rgba(245, 158, 11, 0.2);
-    color: #fbbf24;
-}
-
-.risk-high {
-    background: rgba(239, 68, 68, 0.2);
-    color: #f87171;
-}
-
-.risk-factors {
-    list-style: none;
-    padding: 0;
-    margin-top: 12px;
-}
-
-.risk-factors li {
-    padding: 8px 12px;
-    background: var(--bg-dark);
-    border-radius: 6px;
-    margin-bottom: 8px;
-    color: var(--text-light);
-    font-size: 0.9rem;
-}
-
-.risk-factors li:before {
-    content: "• ";
-    color: var(--primary-green);
-    font-weight: bold;
-    margin-right: 8px;
-}
-
-.flag-alert {
-    background: rgba(239, 68, 68, 0.15);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    padding: 16px;
-    border-radius: 12px;
+.form-group {
     margin-bottom: 20px;
 }
 
-.flag-alert h4 {
-    color: #f87171;
+.form-label {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--text-medium);
     margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.form-input, .form-select, .form-textarea {
+    width: 100%;
+    padding: 12px;
+    background: var(--bg-dark);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 8px;
+    color: var(--text-light);
+    font-size: 1rem;
+}
+
+.form-textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+.modal-actions {
     display: flex;
-    align-items: center;
-    gap: 8px;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.btn-primary {
+    background: var(--primary-green);
+    color: white;
+    flex: 1;
+}
+
+.btn-secondary {
+    background: var(--bg-dark);
+    color: var(--text-light);
+    flex: 1;
 }
 </style>
 
+<a href="{% url 'dashboard' %}" class="back-button">
+    <i class="fas fa-arrow-left"></i>
+    Back to Dashboard
+</a>
+
+<div class="page-header">
+    <h1 class="page-title">🔔 Alerts Center</h1>
+    <p class="page-subtitle">Monitor and manage security alerts across all sites</p>
+</div>
+
+<!-- STATS CARDS -->
+<div class="stats-grid">
+    <div class="stat-card critical">
+        <div class="stat-value critical">{{ stats.critical }}</div>
+        <div class="stat-label">Critical Alerts</div>
+    </div>
+    <div class="stat-card high">
+        <div class="stat-value high">{{ stats.high }}</div>
+        <div class="stat-label">High Priority</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value medium">{{ stats.medium }}</div>
+        <div class="stat-label">Medium Priority</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value low">{{ stats.low }}</div>
+        <div class="stat-label">Low Priority</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="color: var(--text-white);">{{ stats.resolved_today }}</div>
+        <div class="stat-label">Resolved Today</div>
+    </div>
+</div>
+
+<!-- CHARTS -->
+<div class="charts-grid">
+    <div class="chart-card">
+        <h3 class="chart-title">Alerts by Priority</h3>
+        <div id="priorityChart" style="width: 100%; height: 250px;"></div>
+    </div>
+    
+    <div class="chart-card">
+        <h3 class="chart-title">Alert Trends (Last 7 Days)</h3>
+        <div id="trendsChart" style="width: 100%; height: 250px;"></div>
+    </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs-container">
+    <button class="tab active" onclick="switchTab('active')">
+        <i class="fas fa-exclamation-circle"></i> Active Alerts ({{ active_count }})
+    </button>
+    <button class="tab" onclick="switchTab('history')">
+        <i class="fas fa-history"></i> Resolved History ({{ resolved_count }})
+    </button>
+    <button class="tab" onclick="switchTab('rules')">
+        <i class="fas fa-cog"></i> Custom Rules ({{ rules_count }})
+    </button>
+</div>
+
+<!-- ACTIVE ALERTS TAB -->
+<div id="activeTab" class="tab-content active">
+    <form method="get" class="filters-bar">
+        <input type="hidden" name="tab" value="active">
+        <div class="filter-group">
+            <label class="filter-label">Priority</label>
+            <select name="priority" class="filter-select">
+                <option value="">All Priorities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label class="filter-label">Rule Type</label>
+            <select name="rule_type" class="filter-select">
+                <option value="">All Types</option>
+                <option value="no_exit">No Exit</option>
+                <option value="overstay">Overstay</option>
+                <option value="rapid_movement">Rapid Movement</option>
+                <option value="manual">Manual</option>
+            </select>
+        </div>
+        <button type="submit" class="bulk-btn resolve">
+            <i class="fas fa-filter"></i> Apply
+        </button>
+    </form>
+    
+    <div id="bulkActionsBar" class="bulk-actions-bar">
+        <span style="color: var(--text-white); font-weight: 600;">
+            <span id="selectedCount">0</span> selected
+        </span>
+        <button class="bulk-btn resolve" onclick="bulkResolve()">
+            <i class="fas fa-check"></i> Resolve Selected
+        </button>
+        <button class="bulk-btn delete" onclick="bulkDelete()">
+            <i class="fas fa-trash"></i> Delete Selected
+        </button>
+    </div>
+    
+    <div class="alerts-table">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 40px;">
+                        <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)">
+                    </th>
+                    <th>Priority</th>
+                    <th>Plate Number</th>
+                    <th>Reason</th>
+                    <th>Rule Type</th>
+                    <th>Flagged At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for alert in active_alerts %}
+                <tr>
+                    <td>
+                        <input type="checkbox" class="alert-checkbox" value="{{ alert.id }}" onchange="updateBulkActions()">
+                    </td>
+                    <td><span class="priority-badge priority-{{ alert.priority }}">{{ alert.priority|upper }}</span></td>
+                    <td style="font-weight: 700; font-family: monospace;">{{ alert.plate_masked }}</td>
+                    <td>{{ alert.reason }}</td>
+                    <td>{{ alert.get_rule_type_display }}</td>
+                    <td>{{ alert.flagged_at|date:"M d, Y H:i" }}</td>
+                    <td>
+                        <button class="action-btn" onclick="viewAlertDetails({{ alert.id }})">
+                            <i class="fas fa-eye"></i> View
+                        </button>
+                        <button class="action-btn" onclick="resolveAlert({{ alert.id }})">
+                            <i class="fas fa-check"></i> Resolve
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- HISTORY TAB -->
+<div id="historyTab" class="tab-content">
+    <div class="alerts-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>Priority</th>
+                    <th>Plate Number</th>
+                    <th>Reason</th>
+                    <th>Flagged At</th>
+                    <th>Resolved At</th>
+                    <th>Resolved By</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for alert in resolved_alerts %}
+                <tr>
+                    <td><span class="priority-badge priority-{{ alert.priority }}">{{ alert.priority|upper }}</span></td>
+                    <td style="font-weight: 700; font-family: monospace;">{{ alert.plate_masked }}</td>
+                    <td>{{ alert.reason }}</td>
+                    <td>{{ alert.flagged_at|date:"M d, H:i" }}</td>
+                    <td>{{ alert.resolved_at|date:"M d, H:i" }}</td>
+                    <td>{{ alert.resolved_by.username }}</td>
+                    <td>
+                        <button class="action-btn" onclick="viewAlertDetails({{ alert.id }})">
+                            <i class="fas fa-eye"></i> View
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- RULES TAB -->
+<div id="rulesTab" class="tab-content">
+    <div style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h3 style="color: var(--text-white); font-size: 1.3rem; margin-bottom: 8px;">Custom Alert Rules</h3>
+            <p style="color: var(--text-medium);">Create automated triggers to flag vehicles based on custom conditions</p>
+        </div>
+        <button class="bulk-btn resolve" onclick="openCreateRuleModal()">
+            <i class="fas fa-plus"></i> Create Rule
+        </button>
+    </div>
+    
+    <div class="alerts-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Rule Name</th>
+                    <th>Condition</th>
+                    <th>Priority</th>
+                    <th>Triggers</th>
+                    <th>Last Triggered</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rule in custom_rules %}
+                <tr>
+                    <td>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" {% if rule.is_active %}checked{% endif %} onchange="toggleRule({{ rule.id }}, this.checked)">
+                            <span style="color: {% if rule.is_active %}var(--primary-green){% else %}var(--text-dark){% endif %};">
+                                {% if rule.is_active %}Active{% else %}Inactive{% endif %}
+                            </span>
+                        </label>
+                    </td>
+                    <td style="font-weight: 600;">{{ rule.name }}</td>
+                    <td>{{ rule.get_condition_type_display }}</td>
+                    <td><span class="priority-badge priority-{{ rule.priority }}">{{ rule.priority|upper }}</span></td>
+                    <td style="font-weight: 600; color: var(--primary-green);">{{ rule.trigger_count }}</td>
+                    <td>{{ rule.last_triggered|date:"M d, H:i"|default:"Never" }}</td>
+                    <td>
+                        <button class="action-btn" onclick="editRule({{ rule.id }})">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button class="action-btn danger" onclick="deleteRule({{ rule.id }})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 60px 20px; color: var(--text-dark);">
+                        <i class="fas fa-cog" style="font-size: 3rem; opacity: 0.3; display: block; margin-bottom: 16px;"></i>
+                        No custom rules created yet. Click "Create Rule" to get started!
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- CREATE ALERT BUTTON (Moved up from chatbot) -->
+<button class="create-alert-btn" onclick="openCreateAlertModal()">
+    <i class="fas fa-plus"></i>
+</button>
+
+<!-- CREATE ALERT MODAL -->
+<div id="createAlertModal" class="modal">
+    <div class="modal-content">
+        <h2 style="color: var(--text-white); margin-bottom: 24px;">Create New Alert</h2>
+        <form method="post" action="{% url 'create_alert' %}">
+            {% csrf_token %}
+            <div class="form-group">
+                <label class="form-label">Plate Number *</label>
+                <input type="text" name="plate_number" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Priority *</label>
+                <select name="priority" class="form-select" required>
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Reason *</label>
+                <input type="text" name="reason" class="form-input" placeholder="e.g., Suspicious activity" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea name="description" class="form-textarea" placeholder="Additional details..."></textarea>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" name="send_email" value="1">
+                    <span class="form-label" style="margin: 0;">Send email notification</span>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeCreateAlertModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Alert</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- CREATE CUSTOM RULE MODAL -->
+<div id="createRuleModal" class="modal">
+    <div class="modal-content" style="max-width: 800px;">
+        <h2 style="color: var(--text-white); margin-bottom: 24px;">Create Custom Alert Rule</h2>
+        <form method="post" action="{% url 'create_custom_rule' %}">
+            {% csrf_token %}
+            <div class="form-group">
+                <label class="form-label">Rule Name *</label>
+                <input type="text" name="name" class="form-input" placeholder="e.g., Wanted Vehicle Detection" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea name="description" class="form-textarea" placeholder="What does this rule do?"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Condition Type *</label>
+                <select name="condition_type" class="form-select" id="conditionType" onchange="showConditionFields()" required>
+                    <option value="">-- Select Condition --</option>
+                    <option value="no_exit">Vehicle has no exit record</option>
+                    <option value="overstay">Vehicle overstays (duration > threshold)</option>
+                    <option value="visit_count">Visit frequency exceeds threshold</option>
+                    <option value="rapid_movement">Visits multiple sites rapidly</option>
+                    <option value="specific_site">Vehicle enters specific site</option>
+                    <option value="time_based">Vehicle enters during specific time</option>
+                    <option value="plate_pattern">Plate matches pattern (WANTED VEHICLES)</option>
+                </select>
+            </div>
+            
+            <!-- Conditional Fields -->
+            <div id="overstayFields" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">Duration Threshold (hours)</label>
+                    <input type="number" name="threshold_hours" class="form-input" placeholder="e.g., 24">
+                </div>
+            </div>
+            
+            <div id="visitCountFields" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">Visit Count Threshold</label>
+                    <input type="number" name="threshold_count" class="form-input" placeholder="e.g., 10 visits per day">
+                </div>
+            </div>
+            
+            <div id="rapidMovementFields" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">Number of Sites</label>
+                    <input type="number" name="threshold_sites" class="form-input" placeholder="e.g., 5 sites in 2 hours">
+                </div>
+            </div>
+            
+            <div id="specificSiteFields" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">Target Site</label>
+                    <select name="target_site" class="form-select">
+                        <option value="">-- Select Site --</option>
+                        {% for site in all_sites %}
+                        <option value="{{ site }}">{{ site }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <div id="timeBasedFields" style="display: none;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group">
+                        <label class="form-label">Start Time</label>
+                        <input type="time" name="time_start" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">End Time</label>
+                        <input type="time" name="time_end" class="form-input">
+                    </div>
+                </div>
+            </div>
+            
+            <div id="platePatternFields" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">Plate Pattern (one per line)</label>
+                    <textarea name="plate_pattern" class="form-textarea" placeholder="Enter wanted plate numbers, one per line:
+KBY123A
+KDP456B
+KDT789C"></textarea>
+                    <small style="color: var(--text-dark); display: block; margin-top: 8px;">
+                        <i class="fas fa-info-circle"></i> Add plate numbers of wanted vehicles. System will auto-flag when they enter ANY site.
+                    </small>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Alert Priority *</label>
+                <select name="priority" class="form-select" required>
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Notifications</label>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" name="send_email" value="1" checked>
+                        <span style="color: var(--text-light);">Send email notifications</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" name="send_sms" value="1">
+                        <span style="color: var(--text-light);">Send SMS notifications</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Email Recipients (comma-separated)</label>
+                <input type="text" name="email_recipients" class="form-input" placeholder="admin@example.com, security@example.com">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">SMS Recipients (comma-separated, with country code)</label>
+                <input type="text" name="sms_recipients" class="form-input" placeholder="+254700123456, +254711234567">
+            </div>
+            
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeCreateRuleModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Rule</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 <script>
-function viewVehicle(plateNumber) {
-    const modal = document.getElementById('vehicleModal');
-    const modalPlate = document.getElementById('modalPlate');
-    const detailsDiv = document.getElementById('vehicleDetails');
+// Priority pie chart
+var priorityData = {{ priority_chart|safe }};
+var piePriority = {
+    labels: priorityData.map(d => d.priority),
+    values: priorityData.map(d => d.count),
+    type: 'pie',
+    marker: {
+        colors: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981']
+    }
+};
+Plotly.newPlot('priorityChart', [piePriority], {
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: '#cbd5e1' },
+    showlegend: true,
+    margin: { t: 20, b: 20, l: 20, r: 20 }
+});
+
+// Trends chart
+var trendsData = {{ trends_chart|safe }};
+var trendTrace = {
+    x: trendsData.map(d => d.date),
+    y: trendsData.map(d => d.count),
+    type: 'scatter',
+    mode: 'lines+markers',
+    line: { color: '#10b981', width: 3 },
+    marker: { size: 8, color: '#10b981' }
+};
+Plotly.newPlot('trendsChart', [trendTrace], {
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: '#cbd5e1' },
+    xaxis: { gridcolor: 'rgba(255,255,255,0.1)' },
+    yaxis: { gridcolor: 'rgba(255,255,255,0.1)' },
+    margin: { t: 20, b: 40, l: 40, r: 20 }
+});
+
+// Tab switching
+function switchTab(tabName) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    event.target.closest('.tab').classList.add('active');
     
-    // Show modal with loading
-    modal.classList.add('active');
-    modalPlate.textContent = plateNumber;
-    detailsDiv.innerHTML = '<div style="text-align: center; padding: 40px;"><i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary-green);"></i><p style="margin-top: 16px; color: var(--text-dark);">Loading vehicle details...</p></div>';
-    
-    // Fetch vehicle data
-    fetch(`/intelligence/api/vehicle/${plateNumber}/`)
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById(tabName + 'Tab').classList.add('active');
+}
+
+// Bulk actions
+function toggleSelectAll(checkbox) {
+    document.querySelectorAll('.alert-checkbox').forEach(cb => {
+        cb.checked = checkbox.checked;
+    });
+    updateBulkActions();
+}
+
+function updateBulkActions() {
+    const checked = document.querySelectorAll('.alert-checkbox:checked').length;
+    document.getElementById('selectedCount').textContent = checked;
+    document.getElementById('bulkActionsBar').classList.toggle('active', checked > 0);
+}
+
+function bulkResolve() {
+    const ids = Array.from(document.querySelectorAll('.alert-checkbox:checked')).map(cb => cb.value);
+    if (confirm(`Resolve ${ids.length} alert(s)?`)) {
+        fetch('/intelligence/api/bulk-resolve-alerts/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ ids: ids })
+        })
         .then(response => response.json())
         .then(data => {
-            let html = '';
-            
-            // Flag alert if flagged
-            if (data.is_flagged) {
-                html += `
-                <div class="flag-alert">
-                    <h4><i class="fas fa-exclamation-triangle"></i> FLAGGED VEHICLE</h4>
-                    <p style="color: var(--text-light); margin-bottom: 8px;"><strong>Reason:</strong> ${data.flag_info.reason}</p>
-                    <p style="color: var(--text-light); margin-bottom: 8px;"><strong>Priority:</strong> ${data.flag_info.priority}</p>
-                    <p style="color: var(--text-light);"><strong>Details:</strong> ${data.flag_info.description}</p>
-                </div>
-                `;
+            if (data.success) {
+                location.reload();
             }
+        });
+    }
+}
+
+function bulkDelete() {
+    const ids = Array.from(document.querySelectorAll('.alert-checkbox:checked')).map(cb => cb.value);
+    if (confirm(`Delete ${ids.length} alert(s)? This cannot be undone.`)) {
+        fetch('/intelligence/api/bulk-delete-alerts/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ ids: ids })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+    }
+}
+
+function resolveAlert(id) {
+    const notes = prompt('Resolution notes (optional):');
+    if (notes !== null) {
+        fetch('/intelligence/api/resolve-alert/' + id + '/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ notes: notes })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+    }
+}
+
+function viewAlertDetails(id) {
+    fetch('/intelligence/api/alert-details/' + id + '/')
+        .then(response => response.json())
+        .then(data => {
+            const modal = document.createElement('div');
+            modal.id = 'alertDetailsModal';
+            modal.style.cssText = 'display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10001; align-items: center; justify-content: center;';
             
-            // Vehicle Details
-            html += `
-            <div class="detail-section">
-                <h3 class="section-title"><i class="fas fa-car"></i> Vehicle Information</h3>
-                <div class="info-grid">
-                    <div class="info-item">
-                        <span class="info-label">Plate Number</span>
-                        <span class="info-value">${data.plate_number}</span>
+            modal.innerHTML = `
+                <div style="background: var(--bg-darker); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 20px; max-width: 700px; width: 90%; max-height: 85vh; overflow-y: auto; padding: 32px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+                        <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-white);">Alert Details</h2>
+                        <button onclick="document.getElementById('alertDetailsModal').remove()" style="background: none; border: none; color: var(--text-dark); font-size: 1.5rem; cursor: pointer;">
+                            <i class="fas fa-times"></i>
+                        </button>
                     </div>
-                    <div class="info-item">
-                        <span class="info-label">Vehicle Type</span>
-                        <span class="info-value">${data.vehicle_type}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Brand</span>
-                        <span class="info-value">${data.vehicle_brand}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Plate Color</span>
-                        <span class="info-value">${data.plate_color}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">First Seen</span>
-                        <span class="info-value">${data.first_seen}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Last Seen</span>
-                        <span class="info-value">${data.last_seen}</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="detail-section">
-                <h3 class="section-title"><i class="fas fa-chart-bar"></i> Activity Summary</h3>
-                <div class="info-grid">
-                    <div class="info-item">
-                        <span class="info-label">Total Visits</span>
-                        <span class="info-value">${data.total_visits}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Sites Visited</span>
-                        <span class="info-value">${data.sites_visited}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Most Frequent Site</span>
-                        <span class="info-value">${data.most_frequent_site}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Avg Duration</span>
-                        <span class="info-value">${data.avg_duration}</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="detail-section">
-                <h3 class="section-title"><i class="fas fa-shield-alt"></i> Risk Assessment</h3>
-                <div style="margin-bottom: 12px;">
-                    <span class="risk-badge risk-${data.risk_score.toLowerCase()}">${data.risk_score} RISK</span>
-                </div>
-                <ul class="risk-factors">
-                    ${data.risk_factors.map(factor => `<li>${factor}</li>`).join('')}
-                </ul>
-            </div>
-            
-            <div class="detail-section">
-                <h3 class="section-title"><i class="fas fa-history"></i> Visit History (Last 10)</h3>
-                <div class="visit-timeline">
-                    ${data.visit_history.map(visit => `
-                        <div class="visit-item">
-                            <div class="visit-header">
-                                <span class="visit-site">${visit.site}</span>
-                                <span class="visit-duration">${visit.duration}</span>
+                    
+                    <div style="display: grid; gap: 24px;">
+                        ${data.is_active ? `
+                            <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); padding: 16px; border-radius: 12px;">
+                                <h4 style="color: #f87171; margin-bottom: 8px;"><i class="fas fa-exclamation-triangle"></i> ACTIVE ALERT</h4>
+                                <p style="color: var(--text-light);">This alert is currently active and requires attention.</p>
                             </div>
-                            <div class="visit-times">
-                                Entry: ${visit.entry} | Exit: ${visit.exit}
+                        ` : `
+                            <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 16px; border-radius: 12px;">
+                                <h4 style="color: var(--primary-green); margin-bottom: 8px;"><i class="fas fa-check-circle"></i> RESOLVED</h4>
+                                <p style="color: var(--text-light);">This alert was resolved on ${data.resolved_at}</p>
+                                <p style="color: var(--text-light); margin-top: 8px;"><strong>Resolved by:</strong> ${data.resolved_by}</p>
+                                ${data.resolution_notes ? `<p style="color: var(--text-light); margin-top: 8px;"><strong>Notes:</strong> ${data.resolution_notes}</p>` : ''}
+                            </div>
+                        `}
+                        
+                        <div style="background: var(--bg-dark); padding: 20px; border-radius: 12px;">
+                            <h3 style="color: var(--primary-green); margin-bottom: 16px;"><i class="fas fa-car"></i> Vehicle Information</h3>
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                                <div><span style="color: var(--text-dark);">Plate Number:</span> <strong style="color: var(--text-white); font-family: monospace;">${data.plate_number}</strong></div>
+                                <div><span style="color: var(--text-dark);">Priority:</span> <strong style="color: var(--text-white); text-transform: uppercase;">${data.priority}</strong></div>
+                                <div><span style="color: var(--text-dark);">Rule Type:</span> <strong style="color: var(--text-white);">${data.rule_type_display}</strong></div>
+                                <div><span style="color: var(--text-dark);">Flagged At:</span> <strong style="color: var(--text-white);">${data.flagged_at}</strong></div>
                             </div>
                         </div>
-                    `).join('')}
+                        
+                        <div style="background: var(--bg-dark); padding: 20px; border-radius: 12px;">
+                            <h3 style="color: var(--primary-green); margin-bottom: 16px;"><i class="fas fa-info-circle"></i> Alert Details</h3>
+                            <div style="margin-bottom: 12px;">
+                                <span style="color: var(--text-dark);">Reason:</span>
+                                <p style="color: var(--text-white); margin-top: 4px; font-weight: 600;">${data.reason}</p>
+                            </div>
+                            ${data.description ? `
+                                <div style="margin-top: 16px;">
+                                    <span style="color: var(--text-dark);">Description:</span>
+                                    <p style="color: var(--text-light); margin-top: 4px;">${data.description}</p>
+                                </div>
+                            ` : ''}
+                            <div style="margin-top: 16px;">
+                                <span style="color: var(--text-dark);">Flagged By:</span>
+                                <p style="color: var(--text-white); margin-top: 4px;">${data.flagged_by}</p>
+                            </div>
+                        </div>
+                        
+                        <div style="background: var(--bg-dark); padding: 20px; border-radius: 12px;">
+                            <h3 style="color: var(--primary-green); margin-bottom: 16px;"><i class="fas fa-bell"></i> Notifications</h3>
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                                <div>
+                                    <span style="color: var(--text-dark);">Email Sent:</span>
+                                    <strong style="color: ${data.email_sent ? 'var(--primary-green)' : '#f87171'}; margin-left: 8px;">
+                                        ${data.email_sent ? '✓ Yes' : '✗ No'}
+                                    </strong>
+                                </div>
+                                <div>
+                                    <span style="color: var(--text-dark);">SMS Sent:</span>
+                                    <strong style="color: ${data.sms_sent ? 'var(--primary-green)' : '#f87171'}; margin-left: 8px;">
+                                        ${data.sms_sent ? '✓ Yes' : '✗ No'}
+                                    </strong>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; gap: 12px; margin-top: 8px;">
+                            ${data.is_active ? `
+                                <button onclick="resolveAlert(${data.id}); document.getElementById('alertDetailsModal').remove();" class="btn btn-primary" style="flex: 1; background: var(--primary-green);">
+                                    <i class="fas fa-check"></i> Resolve Alert
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
                 </div>
-            </div>
             `;
             
-            detailsDiv.innerHTML = html;
+            document.body.appendChild(modal);
+            
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
         })
         .catch(error => {
-            detailsDiv.innerHTML = `
-                <div style="text-align: center; padding: 40px; color: #f87171;">
-                    <i class="fas fa-exclamation-circle" style="font-size: 2rem;"></i>
-                    <p style="margin-top: 16px;">Error loading vehicle details</p>
-                </div>
-            `;
+            alert('Error loading alert details');
         });
 }
 
-function closeVehicleModal() {
-    document.getElementById('vehicleModal').classList.remove('active');
+// Modal functions
+function openCreateAlertModal() {
+    document.getElementById('createAlertModal').style.display = 'flex';
 }
 
-// Close on outside click
-document.getElementById('vehicleModal').addEventListener('click', function(e) {
+function closeCreateAlertModal() {
+    document.getElementById('createAlertModal').style.display = 'none';
+}
+
+function openCreateRuleModal() {
+    document.getElementById('createRuleModal').style.display = 'flex';
+}
+
+function closeCreateRuleModal() {
+    document.getElementById('createRuleModal').style.display = 'none';
+}
+
+function showConditionFields() {
+    document.querySelectorAll('[id$="Fields"]').forEach(el => el.style.display = 'none');
+    
+    const conditionType = document.getElementById('conditionType').value;
+    if (conditionType) {
+        const fieldsId = conditionType.replace(/_([a-z])/g, (m, p1) => p1.toUpperCase()) + 'Fields';
+        const element = document.getElementById(fieldsId);
+        if (element) {
+            element.style.display = 'block';
+        }
+    }
+}
+
+function toggleRule(ruleId, isActive) {
+    fetch('/intelligence/api/toggle-rule/' + ruleId + '/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ is_active: isActive })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            alert('Error toggling rule');
+            location.reload();
+        }
+    });
+}
+
+function editRule(ruleId) {
+    alert('Edit rule functionality coming soon!');
+}
+
+function deleteRule(ruleId) {
+    if (confirm('Delete this rule? This cannot be undone.')) {
+        fetch('/intelligence/api/delete-rule/' + ruleId + '/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+    }
+}
+
+// Close modals on outside click
+document.getElementById('createAlertModal').addEventListener('click', function(e) {
     if (e.target === this) {
-        closeVehicleModal();
+        closeCreateAlertModal();
     }
 });
+
+document.getElementById('createRuleModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeCreateRuleModal();
+    }
+});
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
 </script>
+
 {% endblock %}

@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.db.models import Count, Max, Q, F, ExpressionWrapper, DurationField,Avg
 from django.utils import timezone
 from datetime import timedelta, datetime
-from .models import CustomUser, Vehicle, VehicleFlag, AuditLog
+from .models import CustomUser, Vehicle, VehicleFlag, AuditLog,CustomAlertRule
 
 def get_client_ip(request):
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
@@ -102,8 +102,7 @@ def dashboard_view(request):
     # RECENT ACTIVITIES (Last 10 entries from data)
     # ============================================
     recent_vehicles = Vehicle.objects.order_by('-entry_time')[:5]
-    recent_flags = VehicleFlag.objects.filter(is_active=True).order_by('-created_at')[:3]
-
+    recent_flags = VehicleFlag.objects.filter(is_active=True).order_by('-flagged_at')[:3]
     activities = []
 
     # Add recent vehicle entries (show actual entry time, not relative)
@@ -125,7 +124,7 @@ def dashboard_view(request):
             'type': 'alert',
             'icon': 'exclamation-triangle',
             'text': f'<strong>{plate_masked}</strong> flagged - {flag.get_reason_display()}',
-            'time': flag.created_at.strftime('%b %d, %Y %H:%M')
+            'time': flag.flagged_at.strftime('%b %d, %Y %H:%M')
         })
 
     # ============================================
@@ -441,20 +440,6 @@ def duration_analytics(request):
 # ==========================================
 
 @login_required
-def vehicle_list(request):
-    """List all vehicles"""
-    vehicles = Vehicle.objects.values('plate_number').annotate(
-        visit_count=Count('id'),
-        last_seen=Max('entry_time')
-    ).order_by('-last_seen')[:100]
-    
-    context = {
-        'vehicles': vehicles,
-    }
-    
-    return render(request, 'vehicles/vehicle_list.html', context)
-
-@login_required
 def vehicle_search(request):
     """Search vehicle behavior"""
     plate = request.GET.get('plate', '')
@@ -476,14 +461,280 @@ def vehicle_search(request):
 
 @login_required
 def alerts_center(request):
-    """Alerts management"""
-    active_alerts = VehicleFlag.objects.filter(is_active=True).order_by('-created_at')
+    """Enhanced alerts center with graphs, bulk actions, and history"""
+    from datetime import timedelta
+    import json
     
-    context = {
-        'active_alerts': active_alerts,
+    # Get active tab
+    active_tab = request.GET.get('tab', 'active')
+    
+    # STATS
+    stats = {
+        'critical': VehicleFlag.objects.filter(is_active=True, priority='critical').count(),
+        'high': VehicleFlag.objects.filter(is_active=True, priority='high').count(),
+        'medium': VehicleFlag.objects.filter(is_active=True, priority='medium').count(),
+        'low': VehicleFlag.objects.filter(is_active=True, priority='low').count(),
+        'resolved_today': VehicleFlag.objects.filter(
+            is_active=False,
+            resolved_at__date=timezone.now().date()
+        ).count(),
     }
     
+    # ACTIVE ALERTS (with filters)
+    priority_filter = request.GET.get('priority', '')
+    rule_type_filter = request.GET.get('rule_type', '')
+    
+    active_alerts_qs = VehicleFlag.objects.filter(is_active=True).order_by('-flagged_at')
+    
+    if priority_filter:
+        active_alerts_qs = active_alerts_qs.filter(priority=priority_filter)
+    
+    if rule_type_filter:
+        active_alerts_qs = active_alerts_qs.filter(rule_type=rule_type_filter)
+    
+    active_alerts = []
+    for alert in active_alerts_qs[:100]:  # Limit to 100
+        active_alerts.append({
+            'id': alert.id,
+            'plate_number': alert.plate_number,
+            'plate_masked': mask_plate_number(alert.plate_number),
+            'reason': alert.reason,
+            'priority': alert.priority,
+            'rule_type': alert.rule_type,
+            'get_rule_type_display': alert.get_rule_type_display(),
+            'flagged_at': alert.flagged_at,
+        })
+    
+    # RESOLVED ALERTS (history)
+    resolved_alerts_qs = VehicleFlag.objects.filter(is_active=False).order_by('-resolved_at')[:50]
+    
+    resolved_alerts = []
+    for alert in resolved_alerts_qs:
+        resolved_alerts.append({
+            'id': alert.id,
+            'plate_number': alert.plate_number,
+            'plate_masked': mask_plate_number(alert.plate_number),
+            'reason': alert.reason,
+            'priority': alert.priority,
+            'flagged_at': alert.flagged_at,
+            'resolved_at': alert.resolved_at,
+            'resolved_by': alert.resolved_by,
+        })
+    
+    # PRIORITY PIE CHART DATA
+    priority_chart = [
+        {'priority': 'Critical', 'count': stats['critical']},
+        {'priority': 'High', 'count': stats['high']},
+        {'priority': 'Medium', 'count': stats['medium']},
+        {'priority': 'Low', 'count': stats['low']},
+    ]
+    
+    # TRENDS CHART (last 7 days)
+    trends_chart = []
+    for i in range(6, -1, -1):
+        date = timezone.now().date() - timedelta(days=i)
+        count = VehicleFlag.objects.filter(
+            flagged_at__date=date
+        ).count()
+        trends_chart.append({
+            'date': date.strftime('%b %d'),
+            'count': count
+        })
+    
+    # CUSTOM RULES
+    custom_rules = CustomAlertRule.objects.all().order_by('-created_at')
+    
+    # Get all sites for rule creation modal
+    all_sites = Vehicle.objects.values_list('site_name', flat=True).distinct().order_by('site_name')
+    
+    context = {
+        'stats': stats,
+        'active_alerts': active_alerts,
+        'resolved_alerts': resolved_alerts,
+        'active_count': len(active_alerts),
+        'resolved_count': len(resolved_alerts),
+        'rules_count': custom_rules.count(),
+        'custom_rules': custom_rules,
+        'all_sites': all_sites,}
+    
     return render(request, 'alerts/alerts_center.html', context)
+
+
+@login_required
+def create_alert(request):
+    """Create a new manual alert"""
+    if request.method == 'POST':
+        plate_number = request.POST.get('plate_number', '').strip().upper()
+        priority = request.POST.get('priority', 'medium')
+        reason = request.POST.get('reason', '')
+        description = request.POST.get('description', '')
+        send_email = request.POST.get('send_email') == '1'
+        
+        # Create the alert
+        alert = VehicleFlag.objects.create(
+            plate_number=plate_number,
+            priority=priority,
+            reason=reason,
+            description=description,
+            rule_type='manual',
+            flagged_by=request.user,
+            email_sent=False,  # Will be updated after sending
+        )
+        
+        # Send email notification if requested
+        if send_email:
+            try:
+                send_alert_email(alert, request.user)
+                alert.email_sent = True
+                alert.save()
+            except Exception as e:
+                print(f"Error sending email: {e}")
+        
+        # Create audit log
+        AuditLog.objects.create(
+            user=request.user,
+            action='create_alert',
+            details=f'Created alert for {plate_number}: {reason}',
+            ip_address=get_client_ip(request)
+        )
+        
+        messages.success(request, f'Alert created for {plate_number}')
+        return redirect('alerts_center')
+    
+    return redirect('alerts_center')
+
+
+@login_required
+def resolve_alert_api(request, alert_id):
+    """API endpoint to resolve a single alert"""
+    from django.http import JsonResponse
+    import json
+    
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            notes = data.get('notes', '')
+            
+            alert = VehicleFlag.objects.get(id=alert_id)
+            alert.is_active = False
+            alert.resolved_at = timezone.now()
+            alert.resolved_by = request.user
+            alert.resolution_notes = notes
+            alert.save()
+            
+            # Create audit log
+            AuditLog.objects.create(
+                user=request.user,
+                action='resolve_alert',
+                details=f'Resolved alert for {alert.plate_number}: {alert.reason}',
+                ip_address=get_client_ip(request)
+            )
+            
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    
+    return JsonResponse({'success': False}, status=400)
+
+
+@login_required
+def bulk_resolve_alerts(request):
+    """Bulk resolve multiple alerts"""
+    from django.http import JsonResponse
+    import json
+    
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            ids = data.get('ids', [])
+            
+            alerts = VehicleFlag.objects.filter(id__in=ids, is_active=True)
+            count = alerts.count()
+            
+            alerts.update(
+                is_active=False,
+                resolved_at=timezone.now(),
+                resolved_by=request.user,
+                resolution_notes='Bulk resolved'
+            )
+            
+            # Create audit log
+            AuditLog.objects.create(
+                user=request.user,
+                action='bulk_resolve_alerts',
+                details=f'Bulk resolved {count} alerts',
+                ip_address=get_client_ip(request)
+            )
+            
+            return JsonResponse({'success': True, 'count': count})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    
+    return JsonResponse({'success': False}, status=400)
+
+
+@login_required
+def bulk_delete_alerts(request):
+    """Bulk delete multiple alerts"""
+    from django.http import JsonResponse
+    import json
+    
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            ids = data.get('ids', [])
+            
+            count = VehicleFlag.objects.filter(id__in=ids).count()
+            VehicleFlag.objects.filter(id__in=ids).delete()
+            
+            # Create audit log
+            AuditLog.objects.create(
+                user=request.user,
+                action='bulk_delete_alerts',
+                details=f'Bulk deleted {count} alerts',
+                ip_address=get_client_ip(request)
+            )
+            
+            return JsonResponse({'success': True, 'count': count})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    
+    return JsonResponse({'success': False}, status=400)
+
+
+def send_alert_email(alert, user):
+    """Send email notification for alert"""
+    from django.core.mail import send_mail
+    from django.conf import settings
+    
+    subject = f'[{alert.priority.upper()}] Vehicle Alert: {alert.plate_number}'
+    
+    message = f"""
+    New vehicle alert created:
+    
+    Plate Number: {alert.plate_number}
+    Priority: {alert.priority.upper()}
+    Reason: {alert.reason}
+    Description: {alert.description or 'N/A'}
+    
+    Flagged by: {user.username}
+    Time: {alert.flagged_at.strftime('%Y-%m-%d %H:%M:%S')}
+    
+    Please review this alert in the system.
+    """
+    
+    # You need to configure email settings in settings.py
+    try:
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [user.email],  # Send to the user who created it (or configure recipient list)
+            fail_silently=False,
+        )
+    except Exception as e:
+        print(f"Email send error: {e}")
+        raise
 
 @login_required
 def watchlist(request):
@@ -537,7 +788,7 @@ def watchlist(request):
         return redirect('watchlist')
     
     # Get flagged vehicles
-    flagged = VehicleFlag.objects.filter(is_active=True).order_by('-created_at')
+    flagged = VehicleFlag.objects.filter(is_active=True).order_by('-flagged_at')
     
     # Get recent unique plates for autocomplete (last 100)
     recent_plates = Vehicle.objects.values_list('plate_number', flat=True).distinct().order_by('-entry_time')[:100]
@@ -551,23 +802,64 @@ def watchlist(request):
 
 @login_required
 def vehicle_detail_api(request, plate_number):
-    """API endpoint to get vehicle details"""
-    import json
+    """API endpoint to get full vehicle details with audit logging"""
     from django.http import JsonResponse
-    from django.db.models import Count, Min, Max, Avg, F, ExpressionWrapper, DurationField
     
-    # Get all records for this vehicle
-    vehicles = Vehicle.objects.filter(plate_number__iexact=plate_number).order_by('-entry_time')
+    # LOG THE PROFILE VIEW
+    AuditLog.objects.create(
+        user=request.user,
+        action='view_vehicle_profile',
+        details=f'Viewed profile for: {plate_number}',
+        ip_address=get_client_ip(request)
+    )
+    
+    # Get all visits for this vehicle
+    vehicles = Vehicle.objects.filter(plate_number__iexact=plate_number).order_by('entry_time')
     
     if not vehicles.exists():
         return JsonResponse({'error': 'Vehicle not found'}, status=404)
     
-    # Get basic info from most recent record
-    latest = vehicles.first()
+    first_vehicle = vehicles.first()
+    latest_vehicle = vehicles.latest('entry_time')
     
-    # Calculate statistics
+    # Calculate stats
     total_visits = vehicles.count()
     sites_visited = vehicles.values('site_name').distinct().count()
+    
+    # Most frequent site
+    most_frequent = vehicles.values('site_name').annotate(
+        count=Count('id')
+    ).order_by('-count').first()
+    
+    most_frequent_site = most_frequent['site_name'] if most_frequent else 'N/A'
+    
+    # Average duration
+    vehicles_with_duration = vehicles.filter(exit_time__isnull=False).annotate(
+        duration=ExpressionWrapper(
+            F('exit_time') - F('entry_time'),
+            output_field=DurationField()
+        )
+    )
+    
+    avg_duration = 'N/A'
+    if vehicles_with_duration.exists():
+        avg_dur = vehicles_with_duration.aggregate(avg=Avg('duration'))['avg']
+        if avg_dur:
+            hours = int(avg_dur.total_seconds() // 3600)
+            minutes = int((avg_dur.total_seconds() % 3600) // 60)
+            avg_duration = f"{hours}h {minutes}m"
+    
+    # Check if flagged
+    is_flagged = VehicleFlag.objects.filter(plate_number__iexact=plate_number, is_active=True).exists()
+    flag_info = {}
+    
+    if is_flagged:
+        flag = VehicleFlag.objects.filter(plate_number__iexact=plate_number, is_active=True).first()
+        flag_info = {
+            'reason': flag.reason,
+            'priority': flag.priority,
+            'description': flag.description or 'N/A',
+        }
     
     # Get COMPLETE visit history (all visits, not just 10)
     visit_history = []
@@ -590,75 +882,20 @@ def vehicle_detail_api(request, plate_number):
             'vehicle_brand': v.vehicle_brand or 'Unknown',
         })
     
-    # Calculate average duration
-    vehicles_with_duration = vehicles.filter(exit_time__isnull=False).annotate(
-        duration=ExpressionWrapper(F('exit_time') - F('entry_time'), output_field=DurationField())
-    )
-    
-    avg_duration = None
-    if vehicles_with_duration.exists():
-        avg_duration_obj = vehicles_with_duration.aggregate(avg=Avg('duration'))['avg']
-        if avg_duration_obj:
-            avg_hours = int(avg_duration_obj.total_seconds() // 3600)
-            avg_minutes = int((avg_duration_obj.total_seconds() % 3600) // 60)
-            avg_duration = f"{avg_hours}h {avg_minutes}m"
-    
-    # Get most frequent site
-    site_counts = vehicles.values('site_name').annotate(count=Count('id')).order_by('-count')
-    most_frequent_site = site_counts.first()['site_name'] if site_counts.exists() else 'N/A'
-    
-    # Check if flagged
-    is_flagged = VehicleFlag.objects.filter(plate_number__iexact=plate_number, is_active=True).exists()
-    flag_info = None
-    if is_flagged:
-        flag = VehicleFlag.objects.filter(plate_number__iexact=plate_number, is_active=True).first()
-        flag_info = {
-            'reason': flag.get_reason_display(),
-            'priority': flag.get_priority_display(),
-            'description': flag.description
-        }
-    
-    # Risk assessment
-    risk_score = 'LOW'
-    risk_factors = []
-    
-    # Check for no-exit records
-    no_exit_count = vehicles.filter(exit_time__isnull=True).count()
-    if no_exit_count > 0:
-        risk_factors.append(f'{no_exit_count} visit(s) without exit recorded')
-        if no_exit_count > 2:
-            risk_score = 'MEDIUM'
-    
-    # Check for high frequency
-    if total_visits > 20:
-        risk_factors.append(f'High frequency visitor ({total_visits} visits)')
-        if total_visits > 50:
-            risk_score = 'MEDIUM'
-    
-    # Check if flagged
-    if is_flagged:
-        risk_factors.append('Vehicle is flagged in system')
-        risk_score = 'HIGH'
-    
-    if not risk_factors:
-        risk_factors.append('No unusual patterns detected')
-    
     data = {
-        'plate_number': latest.plate_number,
-        'vehicle_type': latest.vehicle_type or 'Unknown',
-        'vehicle_brand': latest.vehicle_brand or 'Unknown',
-        'plate_color': latest.plate_color or 'Unknown',
-        'first_seen': vehicles.aggregate(Min('entry_time'))['entry_time__min'].strftime('%b %d, %Y'),
-        'last_seen': latest.entry_time.strftime('%b %d, %Y %H:%M'),
+        'plate_number': plate_number,
+        'vehicle_type': first_vehicle.vehicle_type or 'Unknown',
+        'vehicle_brand': first_vehicle.vehicle_brand or 'Unknown',
+        'plate_color': first_vehicle.plate_color or 'Unknown',
+        'first_seen': first_vehicle.entry_time.strftime('%b %d, %Y'),
+        'last_seen': latest_vehicle.entry_time.strftime('%b %d, %Y'),
         'total_visits': total_visits,
         'sites_visited': sites_visited,
         'most_frequent_site': most_frequent_site,
-        'avg_duration': avg_duration or 'N/A',
-        'visit_history': visit_history,
+        'avg_duration': avg_duration,
         'is_flagged': is_flagged,
         'flag_info': flag_info,
-        'risk_score': risk_score,
-        'risk_factors': risk_factors,
+        'visit_history': visit_history,
     }
     
     return JsonResponse(data)
@@ -1242,3 +1479,1069 @@ def route_vehicles_api(request):
         'vehicles': vehicles_list,
         'total': len(vehicles_list)
     })
+    
+    
+@login_required
+def audit_plate_view(request):
+    """Log when a user views a full plate number"""
+    import json
+    from django.http import JsonResponse
+    from django.views.decorators.csrf import csrf_exempt
+    
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            plate_number = data.get('plate_number')
+            source = data.get('source', 'Unknown')
+            
+            # Create audit log
+            AuditLog.objects.create(
+                user=request.user,
+                action='view_plate',
+                details=f'Viewed full plate: {plate_number} from {source}',
+                ip_address=get_client_ip(request)
+            )
+            
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request'}, status=400)    
+
+@login_required
+def export_site_performance(request):
+    """Export site performance to CSV"""
+    import csv
+    from django.http import HttpResponse
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="site_performance.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['Site Name', 'Total Entries', 'Unique Vehicles', 'Avg Duration', 'Current Occupancy'])
+    
+    # Get same data as analytics page
+    sites = Vehicle.objects.values('site_name').annotate(
+        total_entries=Count('id'),
+        unique_vehicles=Count('plate_number', distinct=True)
+    ).order_by('-total_entries')
+    
+    for site in sites:
+        writer.writerow([
+            site['site_name'],
+            site['total_entries'],
+            site['unique_vehicles'],
+            'N/A',  # You can calculate this
+            'N/A'   # You can calculate this
+        ])
+    
+    return response
+
+
+@login_required
+def export_vehicle_types(request):
+    """Export vehicle type distribution to CSV"""
+    import csv
+    from django.http import HttpResponse
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="vehicle_types.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['Vehicle Type', 'Count', 'Percentage'])
+    
+    type_stats = Vehicle.objects.values('vehicle_type').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    total = sum(t['count'] for t in type_stats)
+    
+    for t in type_stats:
+        percentage = (t['count'] / total * 100) if total > 0 else 0
+        writer.writerow([
+            t['vehicle_type'] or 'Unknown',
+            t['count'],
+            f"{percentage:.1f}%"
+        ])
+    
+    return response
+
+
+@login_required
+def export_operational_issues(request):
+    """Export operational issues to CSV"""
+    import csv
+    from django.http import HttpResponse
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="operational_issues.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['Issue Type', 'Plate Number', 'Site', 'Entry Time', 'Duration'])
+    
+    # Get no-exit vehicles
+    no_exit = Vehicle.objects.filter(exit_time__isnull=True).order_by('-entry_time')
+    
+    for v in no_exit:
+        duration = timezone.now() - v.entry_time
+        duration_hours = int(duration.total_seconds() // 3600)
+        
+        writer.writerow([
+            'No Exit',
+            v.plate_number,  # Full plate in CSV
+            v.site_name,
+            v.entry_time.strftime('%Y-%m-%d %H:%M'),
+            f"{duration_hours}h ago"
+        ])
+    
+    return response
+
+@login_required
+def audit_logs_view(request):
+    """View audit logs with filters and pagination"""
+    from datetime import datetime, timedelta
+    
+    # Get filters
+    selected_user = request.GET.get('user', '')
+    selected_action = request.GET.get('action', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    search_query = request.GET.get('search', '')
+    page = int(request.GET.get('page', 1))
+    
+    # Base queryset
+    logs_qs = AuditLog.objects.all().order_by('-timestamp')
+    
+    # Apply filters
+    if selected_user:
+        logs_qs = logs_qs.filter(user_id=selected_user)
+    
+    if selected_action:
+        logs_qs = logs_qs.filter(action=selected_action)
+    
+    if search_query:
+        logs_qs = logs_qs.filter(details__icontains=search_query)
+    
+    if date_from:
+        date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
+        logs_qs = logs_qs.filter(timestamp__gte=date_from_obj)
+    
+    if date_to:
+        date_to_obj = datetime.strptime(date_to, '%Y-%m-%d')
+        date_to_obj = date_to_obj.replace(hour=23, minute=59, second=59)
+        logs_qs = logs_qs.filter(timestamp__lte=date_to_obj)
+    
+    # Stats
+    total_logs = logs_qs.count()
+    plate_views = logs_qs.filter(action='view_plate').count()
+    searches = logs_qs.filter(action__icontains='search').count()
+    unique_users = logs_qs.values('user').distinct().count()
+    
+    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_logs = AuditLog.objects.filter(timestamp__gte=today_start).count()
+    
+    # Pagination (20 per page)
+    per_page = 20
+    total_pages = (total_logs + per_page - 1) // per_page
+    
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    logs = list(logs_qs[start_idx:end_idx])
+    
+    # Get all users for filter
+    all_users = CustomUser.objects.all().order_by('username')
+    
+    context = {
+        'logs': logs,
+        'total_logs': total_logs,
+        'plate_views': plate_views,
+        'searches': searches,
+        'unique_users': unique_users,
+        'today_logs': today_logs,
+        'all_users': all_users,
+        'selected_user': selected_user,
+        'selected_action': selected_action,
+        'search_query': search_query,
+        'date_from': date_from,
+        'date_to': date_to,
+        'current_page': page,
+        'total_pages': total_pages,
+    }
+    
+    return render(request, 'audit_logs.html', context)
+
+
+@login_required
+def export_audit_logs(request):
+    """Export audit logs to CSV"""
+    import csv
+    from django.http import HttpResponse
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="audit_logs.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['Timestamp', 'User', 'Action', 'Details', 'IP Address'])
+    
+    logs = AuditLog.objects.all().order_by('-timestamp')
+    
+    for log in logs:
+        writer.writerow([
+            log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            log.user.username,
+            log.action,
+            log.details,
+            log.ip_address
+        ])
+    
+    return response
+
+@login_required
+def vehicle_list(request):
+    """Vehicle profiles page with search and browse functionality"""
+    from datetime import timedelta
+    from django.db.models import Max
+    
+    # Determine active tab
+    active_tab = request.GET.get('tab', 'search')
+    
+    # SEARCH TAB
+    search_plate = request.GET.get('plate', '').strip().upper()
+    search_result = None
+    
+    if search_plate and active_tab == 'search':
+        # LOG THE SEARCH
+        AuditLog.objects.create(
+            user=request.user,
+            action='search_vehicle_profiles',
+            details=f'Searched vehicle profiles for: {search_plate}',
+            ip_address=get_client_ip(request)
+        )
+        
+        # Search for vehicle
+        vehicles = Vehicle.objects.filter(plate_number__iexact=search_plate)
+        
+        if vehicles.exists():
+            first_vehicle = vehicles.first()
+            total_visits = vehicles.count()
+            sites_visited = vehicles.values('site_name').distinct().count()
+            
+            # Get last seen
+            latest_visit = vehicles.order_by('-entry_time').first()
+            last_seen_time = latest_visit.entry_time
+            time_diff = timezone.now() - last_seen_time
+            
+            if time_diff.days > 0:
+                last_seen = f"{time_diff.days}d ago"
+            elif time_diff.seconds >= 3600:
+                last_seen = f"{time_diff.seconds // 3600}h ago"
+            else:
+                last_seen = f"{time_diff.seconds // 60}m ago"
+            
+            search_result = {
+                'plate_number': first_vehicle.plate_number,
+                'vehicle_type': first_vehicle.vehicle_type or 'Unknown',
+                'vehicle_brand': first_vehicle.vehicle_brand or 'Unknown',
+                'total_visits': total_visits,
+                'sites_visited': sites_visited,
+                'last_seen': last_seen,
+            }
+    
+    # BROWSE TAB
+    selected_site = request.GET.get('site', '')
+    selected_vehicle_type = request.GET.get('vehicle_type', '')
+    selected_status = request.GET.get('status', '')
+    page = int(request.GET.get('page', 1))
+    
+    # Get all unique vehicles
+    all_vehicles = Vehicle.objects.values('plate_number').annotate(
+        latest_entry=Max('entry_time')
+    ).order_by('-latest_entry')
+    
+    # Apply filters
+    if selected_site:
+        plates_at_site = Vehicle.objects.filter(site_name=selected_site).values_list('plate_number', flat=True).distinct()
+        all_vehicles = all_vehicles.filter(plate_number__in=plates_at_site)
+    
+    if selected_vehicle_type:
+        plates_of_type = Vehicle.objects.filter(vehicle_type=selected_vehicle_type).values_list('plate_number', flat=True).distinct()
+        all_vehicles = all_vehicles.filter(plate_number__in=plates_of_type)
+    
+    # Status filter
+    if selected_status == 'active':
+        cutoff = timezone.now() - timedelta(days=7)
+        all_vehicles = all_vehicles.filter(latest_entry__gte=cutoff)
+    elif selected_status == 'inactive':
+        cutoff = timezone.now() - timedelta(days=30)
+        all_vehicles = all_vehicles.filter(latest_entry__lt=cutoff)
+    elif selected_status == 'flagged':
+        flagged_plates = VehicleFlag.objects.filter(is_active=True).values_list('plate_number', flat=True)
+        all_vehicles = all_vehicles.filter(plate_number__in=flagged_plates)
+    
+    total_vehicles = all_vehicles.count()
+    
+    # Pagination (50 per page)
+    per_page = 50
+    total_pages = (total_vehicles + per_page - 1) // per_page
+    
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    vehicles_page = list(all_vehicles[start_idx:end_idx])
+    
+    # Build vehicle list with details
+    vehicles = []
+    for v in vehicles_page:
+        plate = v['plate_number']
+        
+        vehicle_records = Vehicle.objects.filter(plate_number=plate)
+        first_record = vehicle_records.first()
+        visit_count = vehicle_records.count()
+        
+        last_seen_time = v['latest_entry']
+        time_diff = timezone.now() - last_seen_time
+        
+        if time_diff.days > 0:
+            last_seen = f"{time_diff.days}d ago"
+        elif time_diff.seconds >= 3600:
+            last_seen = f"{time_diff.seconds // 3600}h ago"
+        else:
+            last_seen = f"{time_diff.seconds // 60}m ago"
+        
+        if VehicleFlag.objects.filter(plate_number=plate, is_active=True).exists():
+            status = 'flagged'
+        elif time_diff.days < 7:
+            status = 'active'
+        else:
+            status = 'inactive'
+        
+        vehicles.append({
+            'plate_number': plate,
+            'plate_masked': mask_plate_number(plate),
+            'vehicle_type': first_record.vehicle_type or 'Unknown',
+            'vehicle_brand': first_record.vehicle_brand or 'Unknown',
+            'visit_count': visit_count,
+            'last_seen': last_seen,
+            'status': status,
+        })
+    
+    all_sites = Vehicle.objects.values_list('site_name', flat=True).distinct().order_by('site_name')
+    vehicle_types = Vehicle.objects.exclude(
+        Q(vehicle_type__isnull=True) | Q(vehicle_type='')
+    ).values_list('vehicle_type', flat=True).distinct().order_by('vehicle_type')
+    
+    context = {
+        'active_tab': active_tab,
+        'search_plate': search_plate,
+        'search_result': search_result,
+        'vehicles': vehicles,
+        'total_vehicles': total_vehicles,
+        'current_page': page,
+        'total_pages': total_pages,
+        'all_sites': all_sites,
+        'vehicle_types': vehicle_types,
+        'selected_site': selected_site,
+        'selected_vehicle_type': selected_vehicle_type,
+        'selected_status': selected_status,
+        'active_alerts_count': VehicleFlag.objects.filter(is_active=True).count(),
+    }
+    
+    return render(request, 'vehicles/vehicle_profiles.html', context)
+
+
+@login_required
+def export_vehicles(request):
+    """Export all vehicles to CSV"""
+    import csv
+    from django.http import HttpResponse
+    from django.db.models import Max, Count
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="all_vehicles.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['Plate Number', 'Vehicle Type', 'Brand', 'Color', 'Total Visits', 'Sites Visited', 'First Seen', 'Last Seen'])
+    
+    # Get all unique vehicles
+    all_vehicles = Vehicle.objects.values('plate_number').annotate(
+        latest_entry=Max('entry_time'),
+        earliest_entry=Min('entry_time')
+    )
+    
+    for v in all_vehicles:
+        plate = v['plate_number']
+        records = Vehicle.objects.filter(plate_number=plate)
+        first_record = records.first()
+        
+        total_visits = records.count()
+        sites_visited = records.values('site_name').distinct().count()
+        
+        writer.writerow([
+            plate,
+            first_record.vehicle_type or 'Unknown',
+            first_record.vehicle_brand or 'Unknown',
+            first_record.plate_color or 'Unknown',
+            total_visits,
+            sites_visited,
+            v['earliest_entry'].strftime('%Y-%m-%d %H:%M') if v['earliest_entry'] else 'N/A',
+            v['latest_entry'].strftime('%Y-%m-%d %H:%M') if v['latest_entry'] else 'N/A',
+        ])
+    
+    return response
+
+@login_required
+def search_vehicles_api(request):
+    """API endpoint for global search with audit logging"""
+    from django.http import JsonResponse
+    from django.db.models import Max, Count
+    
+    query = request.GET.get('q', '').strip().upper()
+    
+    if not query or len(query) < 2:
+        return JsonResponse({'results': []})
+    
+    # LOG THE SEARCH
+    AuditLog.objects.create(
+        user=request.user,
+        action='search_vehicle',
+        details=f'Searched for: {query}',
+        ip_address=get_client_ip(request)
+    )
+    
+    # Search for vehicles matching the query
+    matching_plates = Vehicle.objects.filter(
+        plate_number__icontains=query
+    ).values('plate_number').annotate(
+        latest_entry=Max('entry_time')
+    ).order_by('-latest_entry')[:10]  # Top 10 results
+    
+    results = []
+    for v in matching_plates:
+        plate = v['plate_number']
+        records = Vehicle.objects.filter(plate_number=plate)
+        first_record = records.first()
+        visit_count = records.count()
+        
+        # Calculate last seen
+        last_seen_time = v['latest_entry']
+        time_diff = timezone.now() - last_seen_time
+        
+        if time_diff.days > 0:
+            last_seen = f"{time_diff.days}d ago"
+        elif time_diff.seconds >= 3600:
+            last_seen = f"{time_diff.seconds // 3600}h ago"
+        else:
+            last_seen = f"{time_diff.seconds // 60}m ago"
+        
+        results.append({
+            'plate_number': plate,
+            'plate_masked': mask_plate_number(plate),
+            'vehicle_type': first_record.vehicle_type or 'Unknown',
+            'vehicle_brand': first_record.vehicle_brand or 'Unknown',
+            'visit_count': visit_count,
+            'last_seen': last_seen,
+        })
+    
+    return JsonResponse({'results': results, 'total': len(results)})
+
+@login_required
+def alert_details_api(request, alert_id):
+    """API endpoint to get full alert details"""
+    from django.http import JsonResponse
+    
+    try:
+        alert = VehicleFlag.objects.get(id=alert_id)
+        
+        data = {
+            'id': alert.id,
+            'plate_number': alert.plate_number,
+            'reason': alert.reason,
+            'description': alert.description or '',
+            'priority': alert.priority,
+            'rule_type_display': alert.get_rule_type_display(),
+            'flagged_by': alert.flagged_by.username if alert.flagged_by else 'System',
+            'flagged_at': alert.flagged_at.strftime('%b %d, %Y %H:%M'),
+            'is_active': alert.is_active,
+            'resolved_at': alert.resolved_at.strftime('%b %d, %Y %H:%M') if alert.resolved_at else None,
+            'resolved_by': alert.resolved_by.username if alert.resolved_by else None,
+            'resolution_notes': alert.resolution_notes or '',
+            'email_sent': alert.email_sent,
+            'sms_sent': alert.sms_sent,
+        }
+        
+        return JsonResponse(data)
+    except VehicleFlag.DoesNotExist:
+        return JsonResponse({'error': 'Alert not found'}, status=404)
+    
+@login_required
+def create_custom_rule(request):
+    """Create a new custom alert rule"""
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        description = request.POST.get('description', '')
+        condition_type = request.POST.get('condition_type')
+        priority = request.POST.get('priority', 'medium')
+        
+        # Condition parameters
+        threshold_hours = request.POST.get('threshold_hours')
+        threshold_count = request.POST.get('threshold_count')
+        threshold_sites = request.POST.get('threshold_sites')
+        target_site = request.POST.get('target_site')
+        time_start = request.POST.get('time_start')
+        time_end = request.POST.get('time_end')
+        plate_pattern = request.POST.get('plate_pattern', '')
+        
+        # Notifications
+        send_email = request.POST.get('send_email') == '1'
+        send_sms = request.POST.get('send_sms') == '1'
+        email_recipients = request.POST.get('email_recipients', '')
+        sms_recipients = request.POST.get('sms_recipients', '')
+        
+        # Create the rule
+        rule = CustomAlertRule.objects.create(
+            name=name,
+            description=description,
+            condition_type=condition_type,
+            priority=priority,
+            threshold_hours=int(threshold_hours) if threshold_hours else None,
+            threshold_count=int(threshold_count) if threshold_count else None,
+            threshold_sites=int(threshold_sites) if threshold_sites else None,
+            target_site=target_site if target_site else None,
+            time_start=time_start if time_start else None,
+            time_end=time_end if time_end else None,
+            plate_pattern=plate_pattern,
+            send_email=send_email,
+            send_sms=send_sms,
+            email_recipients=email_recipients,
+            sms_recipients=sms_recipients,
+            created_by=request.user,
+        )
+        
+        messages.success(request, f'Custom rule "{name}" created successfully!')
+        return redirect('alerts_center' + '?tab=rules')
+    
+    return redirect('alerts_center')
+
+
+@login_required
+def toggle_rule_api(request, rule_id):
+    """Toggle custom rule active status"""
+    from django.http import JsonResponse
+    import json
+    
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            is_active = data.get('is_active', False)
+            
+            rule = CustomAlertRule.objects.get(id=rule_id)
+            rule.is_active = is_active
+            rule.save()
+            
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    
+    return JsonResponse({'success': False}, status=400)
+
+
+@login_required
+def delete_rule_api(request, rule_id):
+    """Delete custom rule"""
+    from django.http import JsonResponse
+    
+    if request.method == 'POST':
+        try:
+            rule = CustomAlertRule.objects.get(id=rule_id)
+            rule.delete()
+            
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    
+    return JsonResponse({'success': False}, status=400)
+
+
+def check_custom_rules(vehicle):
+    """
+    Check if a vehicle entry triggers any custom rules
+    Called automatically when a vehicle enters a site
+    """
+    from datetime import timedelta
+    import re
+    
+    active_rules = CustomAlertRule.objects.filter(is_active=True)
+    
+    for rule in active_rules:
+        triggered = False
+        reason = ''
+        
+        if rule.condition_type == 'no_exit':
+            # Check if vehicle has no exit record
+            if not vehicle.exit_time:
+                triggered = True
+                reason = f"No exit record: {rule.name}"
+        
+        elif rule.condition_type == 'overstay':
+            # Check if vehicle overstayed
+            if vehicle.exit_time and rule.threshold_hours:
+                duration = (vehicle.exit_time - vehicle.entry_time).total_seconds() / 3600
+                if duration > rule.threshold_hours:
+                    triggered = True
+                    reason = f"Overstay detected ({duration:.1f}h): {rule.name}"
+        
+        elif rule.condition_type == 'visit_count':
+            # Check visit frequency
+            if rule.threshold_count:
+                today_start = timezone.now().replace(hour=0, minute=0, second=0)
+                today_visits = Vehicle.objects.filter(
+                    plate_number=vehicle.plate_number,
+                    entry_time__gte=today_start
+                ).count()
+                
+                if today_visits >= rule.threshold_count:
+                    triggered = True
+                    reason = f"High visit frequency ({today_visits} visits today): {rule.name}"
+        
+        elif rule.condition_type == 'rapid_movement':
+            # Check rapid multi-site movement
+            if rule.threshold_sites:
+                recent_time = timezone.now() - timedelta(hours=2)
+                recent_sites = Vehicle.objects.filter(
+                    plate_number=vehicle.plate_number,
+                    entry_time__gte=recent_time
+                ).values('site_name').distinct().count()
+                
+                if recent_sites >= rule.threshold_sites:
+                    triggered = True
+                    reason = f"Rapid movement ({recent_sites} sites in 2h): {rule.name}"
+        
+        elif rule.condition_type == 'specific_site':
+            # Check if vehicle entered specific site
+            if rule.target_site and vehicle.site_name == rule.target_site:
+                triggered = True
+                reason = f"Entered monitored site ({rule.target_site}): {rule.name}"
+        
+        elif rule.condition_type == 'time_based':
+            # Check if vehicle entered during specific time
+            if rule.time_start and rule.time_end:
+                entry_time = vehicle.entry_time.time()
+                if rule.time_start <= entry_time <= rule.time_end:
+                    triggered = True
+                    reason = f"Entry during restricted hours: {rule.name}"
+        
+        elif rule.condition_type == 'plate_pattern':
+            # WANTED VEHICLE DETECTION
+            if rule.plate_pattern:
+                wanted_plates = [p.strip().upper() for p in rule.plate_pattern.split('\n') if p.strip()]
+                if vehicle.plate_number.upper() in wanted_plates:
+                    triggered = True
+                    reason = f"🚨 WANTED VEHICLE DETECTED: {rule.name}"
+        
+        # If rule triggered, create alert
+        if triggered:
+            # Check if alert already exists
+            existing = VehicleFlag.objects.filter(
+                plate_number=vehicle.plate_number,
+                is_active=True,
+                reason=reason
+            ).exists()
+            
+            if not existing:
+                alert = VehicleFlag.objects.create(
+                    plate_number=vehicle.plate_number,
+                    reason=reason,
+                    description=rule.description or f"Auto-triggered by rule: {rule.name}",
+                    priority=rule.priority,
+                    rule_type='custom',
+                    flagged_by=rule.created_by,
+                )
+                
+                # Update rule stats
+                rule.last_triggered = timezone.now()
+                rule.trigger_count += 1
+                rule.save()
+                
+                # Send notifications
+                if rule.send_email and rule.email_recipients:
+                    try:
+                        send_rule_alert_email(alert, rule)
+                        alert.email_sent = True
+                        alert.save()
+                    except Exception as e:
+                        print(f"Email error: {e}")
+                
+                if rule.send_sms and rule.sms_recipients:
+                    try:
+                        send_rule_alert_sms(alert, rule)
+                        alert.sms_sent = True
+                        alert.save()
+                    except Exception as e:
+                        print(f"SMS error: {e}")
+
+
+def send_rule_alert_email(alert, rule):
+    """Send HTML email for custom rule trigger"""
+    from django.core.mail import EmailMultipleAlternatives
+    from django.conf import settings
+    
+    subject = f'[{alert.priority.upper()}] Alert: {rule.name}'
+    
+    # Plain text version
+    text_content = f"""
+    VEHICLE ALERT TRIGGERED
+    
+    Rule: {rule.name}
+    Plate Number: {alert.plate_number}
+    Priority: {alert.priority.upper()}
+    
+    Reason: {alert.reason}
+    Description: {alert.description}
+    
+    Triggered at: {alert.flagged_at.strftime('%Y-%m-%d %H:%M:%S')}
+    
+    Please review this alert in the system immediately.
+    """
+    
+    # HTML version
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }}
+            .container {{ max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
+            .header {{ background: {'#ef4444' if alert.priority == 'critical' else '#f59e0b' if alert.priority == 'high' else '#3b82f6'}; color: white; padding: 30px; text-align: center; }}
+            .content {{ padding: 30px; }}
+            .alert-box {{ background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; }}
+            .info-row {{ padding: 12px 0; border-bottom: 1px solid #e5e7eb; }}
+            .label {{ font-weight: bold; color: #6b7280; }}
+            .value {{ color: #111827; }}
+            .footer {{ background: #f9fafb; padding: 20px; text-align: center; color: #6b7280; font-size: 0.875rem; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1 style="margin: 0;">🚨 VEHICLE ALERT</h1>
+                <p style="margin: 10px 0 0 0; font-size: 1.1rem;">{alert.priority.upper()} PRIORITY</p>
+            </div>
+            <div class="content">
+                <div class="alert-box">
+                    <strong>Rule Triggered:</strong> {rule.name}
+                </div>
+                
+                <div class="info-row">
+                    <span class="label">Plate Number:</span>
+                    <span class="value" style="font-family: monospace; font-size: 1.2rem; font-weight: bold;">{alert.plate_number}</span>
+                </div>
+                
+                <div class="info-row">
+                    <span class="label">Reason:</span>
+                    <span class="value">{alert.reason}</span>
+                </div>
+                
+                <div class="info-row">
+                    <span class="label">Description:</span>
+                    <span class="value">{alert.description}</span>
+                </div>
+                
+                <div class="info-row">
+                    <span class="label">Triggered At:</span>
+                    <span class="value">{alert.flagged_at.strftime('%B %d, %Y at %H:%M:%S')}</span>
+                </div>
+                
+                <div style="margin-top: 30px; text-align: center;">
+                    <a href="#" style="background: #10b981; color: white; padding: 12px 32px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+                        View in System
+                    </a>
+                </div>
+            </div>
+            <div class="footer">
+                Vehicle Intelligence System - Automated Alert<br>
+                This is an automated message. Please do not reply to this email.
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    # Send to all recipients
+    recipients = [email.strip() for email in rule.email_recipients.split(',') if email.strip()]
+    
+    msg = EmailMultipleAlternatives(subject, text_content, settings.DEFAULT_FROM_EMAIL, recipients)
+    msg.attach_alternative(html_content, "text/html")
+    msg.send()
+
+
+def send_rule_alert_sms(alert, rule):
+    """Send SMS for custom rule trigger via Africa's Talking"""
+    from django.conf import settings
+    
+    recipients = [phone.strip() for phone in rule.sms_recipients.split(',') if phone.strip()]
+    
+    message = f"ALERT [{alert.priority.upper()}]: {alert.plate_number} - {alert.reason}. Check system immediately."
+    
+    # Africa's Talking Integration
+    try:
+        import africastalking
+        
+        # Initialize SDK
+        africastalking.initialize(
+            username=getattr(settings, 'AFRICASTALKING_USERNAME', 'sandbox'),
+            api_key=getattr(settings, 'AFRICASTALKING_API_KEY', '')
+        )
+        
+        # Get SMS service
+        sms = africastalking.SMS
+        
+        # Send message
+        response = sms.send(message, recipients)
+        print(f"SMS sent successfully: {response}")
+        
+        return True
+    except Exception as e:
+        print(f"SMS sending error: {e}")
+        return False   
+    
+@login_required
+def site_intelligence(request):
+    """Detailed analytics for a specific site"""
+    from datetime import timedelta
+    from django.db.models.functions import ExtractHour, ExtractWeekDay, TruncDate
+    import json
+    
+    # Get selected site
+    site_name = request.GET.get('site', '')
+    
+    # Get all sites for dropdown
+    all_sites = Vehicle.objects.values_list('site_name', flat=True).distinct().order_by('site_name')
+    
+    if not site_name:
+        context = {
+            'site_name': None,
+            'all_sites': all_sites,
+            'active_alerts_count': VehicleFlag.objects.filter(is_active=True).count(),
+        }
+        return render(request, 'site_intelligence.html', context)
+    
+    # Filter vehicles for this site
+    site_vehicles = Vehicle.objects.filter(site_name=site_name)
+    
+    # STATS
+    total_entries = site_vehicles.count()
+    current_occupancy = site_vehicles.filter(exit_time__isnull=True).count()
+    unique_vehicles = site_vehicles.values('plate_number').distinct().count()
+    
+    # Average duration
+    vehicles_with_duration = site_vehicles.filter(exit_time__isnull=False).annotate(
+        duration=ExpressionWrapper(
+            F('exit_time') - F('entry_time'),
+            output_field=DurationField()
+        )
+    )
+    
+    avg_duration = 'N/A'
+    if vehicles_with_duration.exists():
+        avg_dur = vehicles_with_duration.aggregate(avg=Avg('duration'))['avg']
+        if avg_dur:
+            hours = int(avg_dur.total_seconds() // 3600)
+            minutes = int((avg_dur.total_seconds() % 3600) // 60)
+            avg_duration = f"{hours}h {minutes}m"
+    
+    # Today's entries
+    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_entries = site_vehicles.filter(entry_time__gte=today_start).count()
+    
+    stats = {
+        'total_entries': total_entries,
+        'current_occupancy': current_occupancy,
+        'unique_vehicles': unique_vehicles,
+        'avg_duration': avg_duration,
+        'today_entries': today_entries,
+    }
+    
+    # HEATMAP DATA (Hour x Day of Week for last 7 days)
+    seven_days_ago = timezone.now() - timedelta(days=7)
+    heatmap_vehicles = site_vehicles.filter(entry_time__gte=seven_days_ago)
+    
+    # Initialize 24x7 grid (hours x days)
+    heatmap_grid = [[0 for _ in range(7)] for _ in range(24)]
+    
+    heatmap_data_raw = heatmap_vehicles.annotate(
+        hour=ExtractHour('entry_time'),
+        weekday=ExtractWeekDay('entry_time')  # 1=Sunday, 7=Saturday
+    ).values('hour', 'weekday').annotate(count=Count('id'))
+    
+    for item in heatmap_data_raw:
+        hour = item['hour']
+        weekday = item['weekday'] - 1  # Convert to 0-6 (0=Sunday)
+        if 0 <= weekday < 7:
+            heatmap_grid[hour][weekday] = item['count']
+    
+    heatmap_data = {
+        'z': heatmap_grid,
+        'x': ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+        'y': [f"{h:02d}:00" for h in range(24)]
+    }
+    
+    # TREND DATA (Last 30 days)
+    thirty_days_ago = timezone.now() - timedelta(days=30)
+    trend_vehicles = site_vehicles.filter(entry_time__gte=thirty_days_ago)
+    
+    trend_data_raw = trend_vehicles.annotate(
+        date=TruncDate('entry_time')
+    ).values('date').annotate(count=Count('id')).order_by('date')
+    
+    trend_data = []
+    for item in trend_data_raw:
+        trend_data.append({
+            'date': item['date'].strftime('%b %d'),
+            'count': item['count']
+        })
+    
+    # VEHICLE TYPE DATA
+    vehicle_type_raw = site_vehicles.values('vehicle_type').annotate(
+        count=Count('id')
+    ).order_by('-count')[:5]
+    
+    vehicle_type_data = []
+    for item in vehicle_type_raw:
+        vehicle_type_data.append({
+            'type': item['vehicle_type'] or 'Unknown',
+            'count': item['count']
+        })
+    
+    # PEAK HOURS DATA
+    peak_hours_raw = site_vehicles.annotate(
+        hour=ExtractHour('entry_time')
+    ).values('hour').annotate(count=Count('id')).order_by('-count')[:10]
+    
+    peak_hours_data = []
+    for item in peak_hours_raw:
+        peak_hours_data.append({
+            'hour': item['hour'],
+            'count': item['count']
+        })
+    
+    # Sort by hour for better visualization
+    peak_hours_data.sort(key=lambda x: x['hour'])
+    
+    # TOP VEHICLES AT THIS SITE
+    top_vehicles_raw = site_vehicles.values('plate_number').annotate(
+        visit_count=Count('id'),
+        latest_visit=Max('entry_time')
+    ).order_by('-visit_count')[:20]
+    
+    top_vehicles = []
+    for v in top_vehicles_raw:
+        plate = v['plate_number']
+        
+        # Get vehicle details
+        vehicle_records = site_vehicles.filter(plate_number=plate)
+        first_record = vehicle_records.first()
+        
+        # Calculate average duration
+        records_with_duration = vehicle_records.filter(exit_time__isnull=False).annotate(
+            duration=ExpressionWrapper(
+                F('exit_time') - F('entry_time'),
+                output_field=DurationField()
+            )
+        )
+        
+        avg_dur = 'N/A'
+        if records_with_duration.exists():
+            avg_duration_obj = records_with_duration.aggregate(avg=Avg('duration'))['avg']
+            if avg_duration_obj:
+                hrs = int(avg_duration_obj.total_seconds() // 3600)
+                mins = int((avg_duration_obj.total_seconds() % 3600) // 60)
+                avg_dur = f"{hrs}h {mins}m"
+        
+        # Last visit
+        last_visit_time = v['latest_visit']
+        time_diff = timezone.now() - last_visit_time
+        
+        if time_diff.days > 0:
+            last_visit = f"{time_diff.days}d ago"
+        elif time_diff.seconds >= 3600:
+            last_visit = f"{time_diff.seconds // 3600}h ago"
+        else:
+            last_visit = f"{time_diff.seconds // 60}m ago"
+        
+        top_vehicles.append({
+            'plate_number': plate,
+            'plate_masked': mask_plate_number(plate),
+            'vehicle_type': first_record.vehicle_type or 'Unknown',
+            'visit_count': v['visit_count'],
+            'last_visit': last_visit,
+            'avg_duration': avg_dur,
+        })
+    
+    context = {
+        'site_name': site_name,
+        'all_sites': all_sites,
+        'stats': stats,
+        'heatmap_data': json.dumps(heatmap_data),
+        'trend_data': json.dumps(trend_data),
+        'vehicle_type_data': json.dumps(vehicle_type_data),
+        'peak_hours_data': json.dumps(peak_hours_data),
+        'top_vehicles': top_vehicles,
+        'active_alerts_count': VehicleFlag.objects.filter(is_active=True).count(),
+    }
+    
+    return render(request, 'site_intelligence.html', context)
+
+
+@login_required
+def export_site_report(request):
+    """Export comprehensive site report to CSV"""
+    import csv
+    from django.http import HttpResponse
+    
+    site_name = request.GET.get('site', '')
+    
+    if not site_name:
+        return redirect('site_intelligence')
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="site_report_{site_name}_{timezone.now().strftime("%Y%m%d")}.csv"'
+    
+    writer = csv.writer(response)
+    
+    # Header
+    writer.writerow(['SITE INTELLIGENCE REPORT'])
+    writer.writerow(['Site:', site_name])
+    writer.writerow(['Generated:', timezone.now().strftime('%Y-%m-%d %H:%M:%S')])
+    writer.writerow([])
+    
+    # Summary stats
+    site_vehicles = Vehicle.objects.filter(site_name=site_name)
+    total_entries = site_vehicles.count()
+    current_occupancy = site_vehicles.filter(exit_time__isnull=True).count()
+    unique_vehicles = site_vehicles.values('plate_number').distinct().count()
+    
+    writer.writerow(['SUMMARY STATISTICS'])
+    writer.writerow(['Total Entries', total_entries])
+    writer.writerow(['Current Occupancy', current_occupancy])
+    writer.writerow(['Unique Vehicles', unique_vehicles])
+    writer.writerow([])
+    
+    # Top vehicles
+    writer.writerow(['TOP VEHICLES'])
+    writer.writerow(['Rank', 'Plate Number', 'Vehicle Type', 'Visit Count', 'Last Visit'])
+    
+    top_vehicles = site_vehicles.values('plate_number').annotate(
+        visit_count=Count('id'),
+        latest_visit=Max('entry_time')
+    ).order_by('-visit_count')[:50]
+    
+    for idx, v in enumerate(top_vehicles, 1):
+        first_record = site_vehicles.filter(plate_number=v['plate_number']).first()
+        writer.writerow([
+            idx,
+            v['plate_number'],
+            first_record.vehicle_type or 'Unknown',
+            v['visit_count'],
+            v['latest_visit'].strftime('%Y-%m-%d %H:%M') if v['latest_visit'] else 'N/A'
+        ])
+    
+    return response    
