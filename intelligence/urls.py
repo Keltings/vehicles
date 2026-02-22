@@ -20,8 +20,6 @@ urlpatterns = [
     # Alerts
     path('alerts/', views.alerts_center, name='alerts_center'),
     path('api/vehicle/<str:plate_number>/', views.vehicle_detail_api, name='vehicle_detail_api'),
-    path('alerts/resolve/<int:flag_id>/', views.resolve_alert, name='resolve_alert'),
-    path('watchlist/remove/<int:flag_id>/', views.remove_from_watchlist, name='remove_from_watchlist'),
     path('api/route-vehicles/', views.route_vehicles_api, name='route_vehicles_api'),
     path('api/audit-plate-view/', views.audit_plate_view, name='audit_plate_view'),
     path('export/site-performance/', views.export_site_performance, name='export_site_performance'),

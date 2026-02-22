@@ -242,11 +242,6 @@ def mask_plate_number(plate):
 # ANALYTICS VIEWS
 # ==========================================
 
-@login_required
-def analytics_overview(request):
-    """Analytics landing page with module cards"""
-    context = {}
-    return render(request, 'analytics/overview.html', context)
 
 @login_required
 def site_analytics(request):
@@ -555,7 +550,11 @@ def alerts_center(request):
         'resolved_count': len(resolved_alerts),
         'rules_count': custom_rules.count(),
         'custom_rules': custom_rules,
-        'all_sites': all_sites,}
+        'all_sites': all_sites,
+        'priority_chart': json.dumps(priority_chart),
+        'trends_chart': json.dumps(trends_chart),
+        'active_tab': active_tab,
+    }
     
     return render(request, 'alerts/alerts_center.html', context)
 
@@ -737,70 +736,6 @@ def send_alert_email(alert, user):
         raise
 
 @login_required
-def watchlist(request):
-    """Watchlist management"""
-    
-    # Handle form submission
-    if request.method == 'POST':
-        plate_number = request.POST.get('plate_number', '').strip().upper()
-        reason = request.POST.get('reason')
-        priority = request.POST.get('priority')
-        description = request.POST.get('description')
-        alert_on_entry = request.POST.get('alert_on_entry') == 'on'
-        
-        # VALIDATION: Check if vehicle exists in database
-        vehicle_exists = Vehicle.objects.filter(plate_number__iexact=plate_number).exists()
-        
-        if not vehicle_exists:
-            messages.error(request, f'Vehicle {plate_number} not found in database. Please verify the plate number.')
-            return redirect('watchlist')
-        
-        # Check if already flagged
-        already_flagged = VehicleFlag.objects.filter(
-            plate_number__iexact=plate_number,
-            is_active=True
-        ).exists()
-        
-        if already_flagged:
-            messages.warning(request, f'Vehicle {plate_number} is already on the watchlist.')
-            return redirect('watchlist')
-        
-        # Create the flag
-        VehicleFlag.objects.create(
-            plate_number=plate_number,
-            reason=reason,
-            priority=priority,
-            description=description,
-            flagged_by=request.user,
-            alert_on_entry=alert_on_entry,
-            is_active=True
-        )
-        
-        # Log the action
-        AuditLog.objects.create(
-            user=request.user,
-            action='view_plate',
-            details=f'Added {plate_number} to watchlist - Reason: {reason}',
-            ip_address=get_client_ip(request)
-        )
-        
-        messages.success(request, f'Vehicle {plate_number} added to watchlist successfully!')
-        return redirect('watchlist')
-    
-    # Get flagged vehicles
-    flagged = VehicleFlag.objects.filter(is_active=True).order_by('-flagged_at')
-    
-    # Get recent unique plates for autocomplete (last 100)
-    recent_plates = Vehicle.objects.values_list('plate_number', flat=True).distinct().order_by('-entry_time')[:100]
-
-    context = {
-        'flagged_vehicles': flagged,
-        'recent_plates': recent_plates,
-}
-    
-    return render(request, 'alerts/watchlist.html', context)
-
-@login_required
 def vehicle_detail_api(request, plate_number):
     """API endpoint to get full vehicle details with audit logging"""
     from django.http import JsonResponse
@@ -900,52 +835,7 @@ def vehicle_detail_api(request, plate_number):
     
     return JsonResponse(data)
 
-@login_required
-def resolve_alert(request, flag_id):
-    """Mark alert as resolved"""
-    if request.method == 'POST':
-        try:
-            flag = VehicleFlag.objects.get(id=flag_id, is_active=True)
-            flag.is_active = False
-            flag.resolved_at = timezone.now()
-            flag.save()
-            
-            # Log the action
-            AuditLog.objects.create(
-                user=request.user,
-                action='view_plate',
-                details=f'Resolved alert for {flag.plate_number}',
-                ip_address=get_client_ip(request)
-            )
-            
-            messages.success(request, f'Alert for {flag.plate_number} marked as resolved.')
-        except VehicleFlag.DoesNotExist:
-            messages.error(request, 'Alert not found.')
-    
-    return redirect('alerts_center')
 
-@login_required
-def remove_from_watchlist(request, flag_id):
-    """Remove vehicle from watchlist"""
-    if request.method == 'POST':
-        try:
-            flag = VehicleFlag.objects.get(id=flag_id)
-            plate = flag.plate_number
-            flag.delete()
-            
-            # Log the action
-            AuditLog.objects.create(
-                user=request.user,
-                action='view_plate',
-                details=f'Removed {plate} from watchlist',
-                ip_address=get_client_ip(request)
-            )
-            
-            messages.success(request, f'Vehicle {plate} removed from watchlist.')
-        except VehicleFlag.DoesNotExist:
-            messages.error(request, 'Vehicle not found in watchlist.')
-    
-    return redirect('watchlist')
 @login_required
 def analytics_overview(request):
     """Comprehensive analytics overview with tables and operational insights"""
