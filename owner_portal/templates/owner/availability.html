@@ -1,0 +1,322 @@
+{% extends 'owner/base.html' %}
+
+{% block title %}Find Parking - My Parking{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        margin-bottom: 32px;
+    }
+
+    .page-title {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--text-white);
+        margin-bottom: 8px;
+    }
+
+    .page-subtitle {
+        color: var(--text-medium);
+    }
+
+    /* Info Banner */
+    .info-banner {
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 32px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .info-banner i {
+        color: var(--primary-blue);
+        font-size: 1.2rem;
+    }
+
+    .info-banner p {
+        color: var(--text-light);
+        margin: 0;
+        font-size: 0.95rem;
+    }
+
+    /* Sites Grid */
+    .sites-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+        gap: 24px;
+    }
+
+    .site-card {
+        background: var(--bg-darker);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        border-radius: 16px;
+        padding: 24px;
+        transition: all 0.3s;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .site-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
+    }
+
+    .site-card.user-visited {
+        border-color: rgba(16, 185, 129, 0.4);
+    }
+
+    .visited-badge {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        background: rgba(16, 185, 129, 0.2);
+        color: var(--success);
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+
+    .site-header {
+        margin-bottom: 20px;
+    }
+
+    .site-name {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: var(--text-white);
+        margin-bottom: 8px;
+    }
+
+    .site-status {
+        display: inline-block;
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 700;
+    }
+
+    .status-success {
+        background: rgba(16, 185, 129, 0.2);
+        color: var(--success);
+    }
+
+    .status-warning {
+        background: rgba(245, 158, 11, 0.2);
+        color: var(--warning);
+    }
+
+    .status-danger {
+        background: rgba(239, 68, 68, 0.2);
+        color: var(--danger);
+    }
+
+    .site-info {
+        margin-top: 20px;
+    }
+
+    .info-row {
+        display: flex;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .info-row:last-child {
+        border-bottom: none;
+    }
+
+    .info-icon {
+        width: 32px;
+        color: var(--primary-blue);
+        font-size: 1.1rem;
+    }
+
+    .info-label {
+        flex: 1;
+        color: var(--text-medium);
+        font-size: 0.9rem;
+    }
+
+    .info-value {
+        color: var(--text-white);
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+
+    .occupancy-large {
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: var(--primary-blue);
+    }
+
+    .no-sites {
+        text-align: center;
+        padding: 100px 20px;
+        color: var(--text-dark);
+    }
+
+    .no-sites i {
+        font-size: 5rem;
+        opacity: 0.3;
+        margin-bottom: 20px;
+        display: block;
+    }
+
+    /* Summary Stats */
+    .summary-stats {
+        background: var(--bg-darker);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 32px;
+        display: flex;
+        justify-content: space-around;
+        gap: 20px;
+    }
+
+    .summary-item {
+        text-align: center;
+    }
+
+    .summary-value {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--primary-blue);
+        margin-bottom: 4px;
+    }
+
+    .summary-label {
+        font-size: 0.85rem;
+        color: var(--text-medium);
+        text-transform: uppercase;
+    }
+
+    @media (max-width: 768px) {
+        .sites-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .summary-stats {
+            flex-direction: column;
+            gap: 16px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-map-marked-alt"></i> Find Parking
+    </h1>
+    <p class="page-subtitle">Real-time availability across all parking sites</p>
+</div>
+
+<!-- INFO BANNER -->
+<div class="info-banner">
+    <i class="fas fa-info-circle"></i>
+    <p>
+        <strong>Note:</strong> Occupancy estimates are based on current activity. 
+        Exact capacity data will be available soon for more accurate availability.
+    </p>
+</div>
+
+<!-- SUMMARY STATS -->
+<div class="summary-stats">
+    <div class="summary-item">
+        <div class="summary-value">{{ total_sites }}</div>
+        <div class="summary-label">Available Sites</div>
+    </div>
+    <div class="summary-item">
+        <div class="summary-value">{{ sites|length }}</div>
+        <div class="summary-label">Showing Now</div>
+    </div>
+    <div class="summary-item">
+        <div class="summary-value">
+            {% with visited_count=sites|length %}
+            {% for site in sites %}{% if site.user_visited %}{{ forloop.counter }}{% endif %}{% endfor %}
+            {% endwith %}
+        </div>
+        <div class="summary-label">You've Visited</div>
+    </div>
+</div>
+
+<!-- SITES GRID -->
+{% if sites %}
+<div class="sites-grid">
+    {% for site in sites %}
+    <div class="site-card {% if site.user_visited %}user-visited{% endif %}">
+        {% if site.user_visited %}
+        <div class="visited-badge">
+            <i class="fas fa-check-circle"></i> You've parked here
+        </div>
+        {% endif %}
+
+        <div class="site-header">
+            <div class="site-name">
+                <i class="fas fa-parking"></i> {{ site.name }}
+            </div>
+            <span class="site-status status-{{ site.status_color }}">
+                {{ site.status_text }}
+            </span>
+        </div>
+
+        <div class="site-info">
+            <div class="info-row">
+                <div class="info-icon">
+                    <i class="fas fa-car"></i>
+                </div>
+                <div class="info-label">Current Activity</div>
+                <div class="info-value">
+                    <span class="occupancy-large">~{{ site.current_occupancy }}</span> vehicles
+                </div>
+            </div>
+
+            <div class="info-row">
+                <div class="info-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="info-label">Avg Stay Time</div>
+                <div class="info-value">{{ site.avg_duration }}</div>
+            </div>
+
+            <div class="info-row">
+                <div class="info-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="info-label">Peak Hours</div>
+                <div class="info-value">{{ site.peak_hours }}</div>
+            </div>
+
+            <div class="info-row">
+                <div class="info-icon">
+                    <i class="fas fa-calendar-day"></i>
+                </div>
+                <div class="info-label">Today's Entries</div>
+                <div class="info-value">{{ site.today_entries }} vehicles</div>
+            </div>
+
+            <div class="info-row">
+                <div class="info-icon">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+                <div class="info-label">Typical Fee</div>
+                <div class="info-value">{{ site.typical_fee }}</div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="no-sites">
+    <i class="fas fa-map-marked-alt"></i>
+    <h3 style="color: var(--text-white); margin-bottom: 12px;">No Parking Sites Available</h3>
+    <p>No parking sites found in the system.</p>
+</div>
+{% endif %}
+
+{% endblock %}

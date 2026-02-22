@@ -22,6 +22,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'intelligence',
+    'owner_portal',  # ← ADD THIS
+
 ]
 
 MIDDLEWARE = [

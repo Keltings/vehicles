@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vehicle Intelligence System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #f1f5f9;
+        }
+
+        .container {
+            max-width: 1000px;
+            padding: 40px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .logo {
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #10b981, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 16px;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: #94a3b8;
+        }
+
+        .portals {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 32px;
+        }
+
+        .portal-card {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 20px;
+            padding: 48px 40px;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .portal-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 40px rgba(16, 185, 129, 0.3);
+            border-color: rgba(16, 185, 129, 0.6);
+        }
+
+        .portal-card.blue {
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .portal-card.blue:hover {
+            box-shadow: 0 12px 40px rgba(59, 130, 246, 0.3);
+            border-color: rgba(59, 130, 246, 0.6);
+        }
+
+        .portal-icon {
+            font-size: 4rem;
+            margin-bottom: 24px;
+        }
+
+        .portal-card.green .portal-icon {
+            color: #10b981;
+        }
+
+        .portal-card.blue .portal-icon {
+            color: #3b82f6;
+        }
+
+        .portal-title {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 16px;
+        }
+
+        .portal-desc {
+            color: #94a3b8;
+            margin-bottom: 32px;
+            line-height: 1.6;
+        }
+
+        .portal-btn {
+            display: inline-block;
+            padding: 14px 32px;
+            border-radius: 12px;
+            font-weight: 700;
+            text-decoration: none;
+            transition: all 0.3s;
+            font-size: 1rem;
+        }
+
+        .btn-green {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-green:hover {
+            background: #059669;
+        }
+
+        .btn-blue {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-blue:hover {
+            background: #2563eb;
+        }
+
+        @media (max-width: 768px) {
+            .portals {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <i class="fas fa-car"></i> Vehicle Intelligence System
+            </div>
+            <p class="subtitle">Choose your portal to continue</p>
+        </div>
+
+        <div class="portals">
+            <!-- ADMIN PORTAL -->
+            <div class="portal-card green" onclick="window.location.href='/intelligence/login/'">
+                <div class="portal-icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h2 class="portal-title">Admin Portal</h2>
+                <p class="portal-desc">
+                    For staff and managers.<br>
+                    Access analytics, alerts, and system management.
+                </p>
+                <a href="/intelligence/login/" class="portal-btn btn-green">
+                    <i class="fas fa-sign-in-alt"></i> Admin Login
+                </a>
+            </div>
+
+            <!-- CAR OWNER PORTAL -->
+            <div class="portal-card blue" onclick="window.location.href='/my-parking/'">
+                <div class="portal-icon">
+                    <i class="fas fa-car"></i>
+                </div>
+                <h2 class="portal-title">Car Owner Portal</h2>
+                <p class="portal-desc">
+                    For vehicle owners.<br>
+                    View your parking history and find available spaces.
+                </p>
+                <a href="/my-parking/" class="portal-btn btn-blue">
+                    <i class="fas fa-user"></i> Owner Login
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

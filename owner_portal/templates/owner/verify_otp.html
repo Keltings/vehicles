@@ -1,0 +1,166 @@
+{% extends 'owner/base.html' %}
+
+{% block title %}Verify OTP - My Parking{% endblock %}
+
+{% block extra_css %}
+<style>
+    .verify-container {
+        max-width: 500px;
+        margin: 80px auto;
+        background: var(--bg-darker);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        border-radius: 20px;
+        padding: 48px;
+    }
+
+    .verify-title {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--text-white);
+        margin-bottom: 12px;
+        text-align: center;
+    }
+
+    .verify-subtitle {
+        color: var(--text-medium);
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    .plate-display {
+        background: rgba(59, 130, 246, 0.2);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        padding: 16px;
+        border-radius: 10px;
+        text-align: center;
+        margin-bottom: 32px;
+    }
+
+    .plate-number {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--primary-blue);
+        font-family: monospace;
+    }
+
+    .form-group {
+        margin-bottom: 24px;
+    }
+
+    .form-label {
+        display: block;
+        font-size: 0.9rem;
+        color: var(--text-medium);
+        margin-bottom: 8px;
+        font-weight: 600;
+    }
+
+    .otp-input {
+        width: 100%;
+        padding: 16px;
+        background: var(--bg-dark);
+        border: 2px solid rgba(59, 130, 246, 0.3);
+        border-radius: 10px;
+        color: var(--text-light);
+        font-size: 1.8rem;
+        text-align: center;
+        font-family: monospace;
+        font-weight: 700;
+        letter-spacing: 8px;
+    }
+
+    .otp-input:focus {
+        outline: none;
+        border-color: var(--primary-blue);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .submit-btn {
+        width: 100%;
+        padding: 14px;
+        background: var(--primary-blue);
+        border: none;
+        border-radius: 10px;
+        color: white;
+        font-size: 1rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .submit-btn:hover {
+        background: var(--primary-blue-dark);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
+
+    .back-link {
+        display: block;
+        text-align: center;
+        margin-top: 20px;
+        color: var(--text-medium);
+        text-decoration: none;
+    }
+
+    .back-link:hover {
+        color: var(--primary-blue);
+    }
+
+    .info-note {
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        padding: 12px;
+        border-radius: 8px;
+        color: var(--success);
+        font-size: 0.85rem;
+        margin-bottom: 24px;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="verify-container">
+    <h1 class="verify-title">
+        <i class="fas fa-shield-alt" style="color: var(--primary-blue);"></i>
+        Verify Identity
+    </h1>
+    <p class="verify-subtitle">Enter the 6-digit code sent to you</p>
+
+    <div class="plate-display">
+        <div style="font-size: 0.85rem; color: var(--text-dark); margin-bottom: 4px;">Vehicle</div>
+        <div class="plate-number">{{ plate_number }}</div>
+    </div>
+
+    <div class="info-note">
+        <i class="fas fa-info-circle"></i> OTP is valid for 10 minutes
+    </div>
+
+    <form method="post" action="{% url 'owner_portal:verify_otp' %}">
+        {% csrf_token %}
+        <input type="hidden" name="plate_number" value="{{ plate_number }}">
+        
+        <div class="form-group">
+            <label class="form-label">Enter 6-Digit OTP *</label>
+            <input 
+                type="text" 
+                name="otp" 
+                class="otp-input" 
+                placeholder="000000"
+                maxlength="6"
+                pattern="[0-9]{6}"
+                required
+                autofocus
+            >
+        </div>
+
+        <button type="submit" class="submit-btn">
+            <i class="fas fa-check-circle"></i> Verify & Login
+        </button>
+    </form>
+
+    <a href="{% url 'owner_portal:login' %}" class="back-link">
+        <i class="fas fa-arrow-left"></i> Back to login
+    </a>
+</div>
+{% endblock %}

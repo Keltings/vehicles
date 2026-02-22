@@ -54,7 +54,7 @@ class AuditLog(models.Model):
         ('export_data', 'Exported Data'),
     ]
     
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
     action = models.CharField(max_length=50, choices=ACTION_CHOICES)
     details = models.TextField(blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)

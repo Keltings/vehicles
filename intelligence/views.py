@@ -7,6 +7,9 @@ from django.utils import timezone
 from datetime import timedelta, datetime
 from .models import CustomUser, Vehicle, VehicleFlag, AuditLog,CustomAlertRule
 
+def landing_page(request):
+    """Landing page with portal selection"""
+    return render(request, 'landing.html')
 def get_client_ip(request):
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if x_forwarded_for:
@@ -123,7 +126,7 @@ def dashboard_view(request):
         activities.append({
             'type': 'alert',
             'icon': 'exclamation-triangle',
-            'text': f'<strong>{plate_masked}</strong> flagged - {flag.get_reason_display()}',
+            'text': f'<strong>{plate_masked}</strong> flagged - {flag.reason}',
             'time': flag.flagged_at.strftime('%b %d, %Y %H:%M')
         })
 

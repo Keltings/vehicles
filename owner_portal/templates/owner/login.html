@@ -1,0 +1,143 @@
+{% extends 'owner/base.html' %}
+
+{% block title %}Login - My Parking{% endblock %}
+
+{% block extra_css %}
+<style>
+    .login-container {
+        max-width: 500px;
+        margin: 80px auto;
+        background: var(--bg-darker);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        border-radius: 20px;
+        padding: 48px;
+    }
+
+    .login-title {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--text-white);
+        margin-bottom: 12px;
+        text-align: center;
+    }
+
+    .login-subtitle {
+        color: var(--text-medium);
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    .form-group {
+        margin-bottom: 24px;
+    }
+
+    .form-label {
+        display: block;
+        font-size: 0.9rem;
+        color: var(--text-medium);
+        margin-bottom: 8px;
+        font-weight: 600;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 14px 16px;
+        background: var(--bg-dark);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 10px;
+        color: var(--text-light);
+        font-size: 1rem;
+        text-transform: uppercase;
+        font-family: monospace;
+        font-weight: 600;
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: var(--primary-blue);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .submit-btn {
+        width: 100%;
+        padding: 14px;
+        background: var(--primary-blue);
+        border: none;
+        border-radius: 10px;
+        color: white;
+        font-size: 1rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .submit-btn:hover {
+        background: var(--primary-blue-dark);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
+
+    .info-box {
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        padding: 16px;
+        border-radius: 10px;
+        margin-bottom: 24px;
+    }
+
+    .info-box p {
+        color: var(--text-light);
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+
+    .example-plate {
+        background: rgba(59, 130, 246, 0.2);
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-weight: 700;
+        color: var(--primary-blue);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <h1 class="login-title">
+        <i class="fas fa-car" style="color: var(--primary-blue);"></i>
+        Vehicle Login
+    </h1>
+    <p class="login-subtitle">Enter your plate number to view your parking history</p>
+
+    <div class="info-box">
+        <p>
+            <i class="fas fa-info-circle" style="color: var(--primary-blue);"></i>
+            Enter your vehicle's license plate number. We'll send you a one-time password to verify your identity.
+        </p>
+        <p style="margin-top: 8px;">
+            Example: <span class="example-plate">KBY028L</span>
+        </p>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">License Plate Number *</label>
+            <input 
+                type="text" 
+                name="plate_number" 
+                class="form-input" 
+                placeholder="e.g., KBY028L"
+                maxlength="10"
+                required
+                autofocus
+            >
+        </div>
+
+        <button type="submit" class="submit-btn">
+            <i class="fas fa-paper-plane"></i> Send OTP
+        </button>
+    </form>
+</div>
+{% endblock %}

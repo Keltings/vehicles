@@ -1,0 +1,321 @@
+{% extends 'owner/base.html' %}
+
+{% block title %}Dashboard - My Parking{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        margin-bottom: 32px;
+    }
+
+    .page-title {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--text-white);
+        margin-bottom: 8px;
+    }
+
+    .page-subtitle {
+        color: var(--text-medium);
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 40px;
+    }
+
+    .stat-card {
+        background: var(--bg-darker);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        border-radius: 16px;
+        padding: 24px;
+        text-align: center;
+        transition: all 0.3s;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
+    }
+
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: var(--primary-blue);
+        margin-bottom: 8px;
+    }
+
+    .stat-label {
+        font-size: 0.85rem;
+        color: var(--text-medium);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Quick Stats */
+    .quick-stats {
+        background: var(--bg-darker);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 32px;
+    }
+
+    .quick-stats h3 {
+        color: var(--text-white);
+        margin-bottom: 20px;
+        font-size: 1.2rem;
+    }
+
+    .stat-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 0;
+        border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+    }
+
+    .stat-row:last-child {
+        border-bottom: none;
+    }
+
+    .stat-row-label {
+        color: var(--text-medium);
+    }
+
+    .stat-row-value {
+        color: var(--text-white);
+        font-weight: 600;
+    }
+
+    /* Recent History */
+    .section {
+        background: var(--bg-darker);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 32px;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+
+    .section-title {
+        font-size: 1.3rem;
+        color: var(--text-white);
+        font-weight: 700;
+    }
+
+    .view-all-btn {
+        padding: 8px 16px;
+        background: transparent;
+        border: 1px solid var(--primary-blue);
+        border-radius: 8px;
+        color: var(--primary-blue);
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition: all 0.3s;
+    }
+
+    .view-all-btn:hover {
+        background: rgba(59, 130, 246, 0.1);
+    }
+
+    .history-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .history-table th {
+        background: var(--bg-dark);
+        color: var(--text-medium);
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        padding: 12px;
+        text-align: left;
+        border-bottom: 2px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .history-table td {
+        padding: 16px 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        color: var(--text-light);
+    }
+
+    .history-table tr:hover {
+        background: rgba(59, 130, 246, 0.05);
+    }
+
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+
+    .status-completed {
+        background: rgba(16, 185, 129, 0.2);
+        color: var(--success);
+    }
+
+    .status-progress {
+        background: rgba(245, 158, 11, 0.2);
+        color: var(--warning);
+    }
+
+    .download-btn {
+        padding: 6px 12px;
+        background: transparent;
+        border: 1px solid var(--primary-blue);
+        border-radius: 6px;
+        color: var(--primary-blue);
+        cursor: pointer;
+        text-decoration: none;
+        font-size: 0.85rem;
+    }
+
+    .download-btn:hover {
+        background: rgba(59, 130, 246, 0.1);
+    }
+
+    .no-data {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-dark);
+    }
+
+    .no-data i {
+        font-size: 4rem;
+        opacity: 0.3;
+        margin-bottom: 16px;
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-tachometer-alt"></i> Dashboard
+    </h1>
+    <p class="page-subtitle">Overview of your parking activity</p>
+</div>
+
+{% if no_data %}
+<div class="no-data">
+    <i class="fas fa-inbox"></i>
+    <h3 style="color: var(--text-white); margin-bottom: 8px;">No Parking Records Found</h3>
+    <p>We couldn't find any parking history for your vehicle.</p>
+</div>
+{% else %}
+
+<!-- STATS CARDS -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ total_visits }}</div>
+        <div class="stat-label">Total Visits</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ sites_visited }}</div>
+        <div class="stat-label">Sites Visited</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">KSh {{ total_paid|floatformat:2 }}</div>
+        <div class="stat-label">Total Paid</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ avg_duration }}</div>
+        <div class="stat-label">Avg Duration</div>
+    </div>
+</div>
+
+<!-- QUICK STATS -->
+<div class="quick-stats">
+    <h3><i class="fas fa-chart-line"></i> Quick Stats</h3>
+    <div class="stat-row">
+        <span class="stat-row-label">Most Visited Site</span>
+        <span class="stat-row-value">{{ most_visited_site }}</span>
+    </div>
+    <div class="stat-row">
+        <span class="stat-row-label">Preferred Payment</span>
+        <span class="stat-row-value">{{ preferred_payment_method }}</span>
+    </div>
+    <div class="stat-row">
+        <span class="stat-row-label">First Visit</span>
+        <span class="stat-row-value">{{ first_visit_date|date:"M d, Y" }}</span>
+    </div>
+    <div class="stat-row">
+        <span class="stat-row-label">Vehicle Type</span>
+        <span class="stat-row-value">{{ vehicle_info.type }}</span>
+    </div>
+    <div class="stat-row">
+        <span class="stat-row-label">Vehicle Brand</span>
+        <span class="stat-row-value">{{ vehicle_info.brand }}</span>
+    </div>
+</div>
+
+<!-- RECENT HISTORY -->
+<div class="section">
+    <div class="section-header">
+        <h3 class="section-title">
+            <i class="fas fa-history"></i> Recent Parking History
+        </h3>
+        <a href="{% url 'owner_portal:history' %}" class="view-all-btn">
+            <i class="fas fa-list"></i> View All
+        </a>
+    </div>
+
+    <table class="history-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Site</th>
+                <th>Entry</th>
+                <th>Exit</th>
+                <th>Duration</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Receipt</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for visit in recent_visits %}
+            <tr>
+                <td>{{ visit.entry|date:"M d, Y" }}</td>
+                <td style="font-weight: 600;">{{ visit.site }}</td>
+                <td>{{ visit.entry|date:"H:i" }}</td>
+                <td>{% if visit.exit %}{{ visit.exit|date:"H:i" }}{% else %}-{% endif %}</td>
+                <td>{{ visit.duration }}</td>
+                <td style="font-weight: 600;">KSh {{ visit.amount_paid|floatformat:2 }}</td>
+                <td>
+                    <span class="status-badge status-{% if visit.exit %}completed{% else %}progress{% endif %}">
+                        {{ visit.status }}
+                    </span>
+                </td>
+                <td>
+                    <a href="{% url 'owner_portal:download_receipt' visit.id %}" class="download-btn" title="Download Receipt">
+                        <i class="fas fa-download"></i>
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- DOWNLOAD SUMMARY -->
+<div style="text-align: center; margin-top: 40px;">
+    <a href="{% url 'owner_portal:download_summary' %}" class="view-all-btn" style="display: inline-block; padding: 12px 32px; font-size: 1rem;">
+        <i class="fas fa-file-pdf"></i> Download Complete Summary (PDF)
+    </a>
+</div>
+
+{% endif %}
+{% endblock %}
